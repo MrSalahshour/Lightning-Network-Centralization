@@ -123,10 +123,10 @@ class FeeEnv(gym.Env):
 
         return self.state, reward, done, info
 
-    def simulate_transactions(self, action):
+    def simulate_transactions(self, action,fees):
         self.simulator.set_channels_fees(action)
 
-        output_transactions_dict = self.simulator.run_simulation(action)
+        output_transactions_dict = self.simulator.run_simulation(action,fees)
         balances, transaction_amounts, transaction_numbers = self.simulator.get_simulation_results(action,
                                                                                                    output_transactions_dict)
 

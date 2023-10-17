@@ -23,7 +23,7 @@ def aggregate_edges(directed_edges):
 
 def get_neighbors(G, src, local_size):
     """localising the network around the node"""
-
+#TODO: #2 maybe a better localizing than BFS-style?
     neighbors = [src]
 
     for i in range(10):
@@ -38,9 +38,8 @@ def get_neighbors(G, src, local_size):
                   return set(neighbors)
                if v not in neighbor:
                   neighbors.append(v)
+   
 
-
-       
 
 def initiate_balances(directed_edges, approach='half'):
     '''
@@ -85,6 +84,8 @@ def set_channels_balances(edges, src, trgs, channel_ids, capacities, initial_bal
     else:
         print("Error : Invalid Input Length")
 
+
+# TODO: #4 add function here
 
 def create_network_dictionary(G):
     keys = list(zip(G["src"], G["trg"]))

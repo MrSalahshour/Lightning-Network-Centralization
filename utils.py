@@ -71,8 +71,12 @@ def load_data(node, directed_edges_path, providers_path, local_size, manual_bala
     data['providers'] = preprocessing.get_providers(providers_path)
     directed_edges = preprocessing.get_directed_edges(directed_edges_path)
     data['src'], data['trgs'], data['channel_ids'], n_channels = preprocessing.select_node(directed_edges, src_index)
+    #TODO: #1 change the following 2 lines
     data['capacities'] = [153243, 8500000, 4101029, 5900000, 2500000, 7000000]
     data['initial_balances'] = [153243 / 2, 8500000 / 2, 4101029 / 2, 5900000 / 2, 2500000 / 2, 7000000 / 2]
+    
+    
+    
     channels = []
     for trg in data['trgs']:
         channels.append((data['src'], trg))

@@ -67,6 +67,7 @@ class simulator():
     graph = nx.DiGraph()
     for key in self.network_dictionary :
       val = self.network_dictionary[key]
+      #val[0] tends to be balance while val[1] and val[2] are fee_base and fee_rate
       if val[0] > amount :
           graph.add_edge(key[0],key[1],weight = val[1]*amount + val[2])
     
@@ -106,6 +107,10 @@ class simulator():
             
     
   
+
+  def add_to_active_channels(self,src,action):
+    for x,y in zip(actions[:midpoint],actions[midpoint:]):
+      
 
 
   def update_active_channels(self, src, trg, transaction_amount):
@@ -198,12 +203,12 @@ class simulator():
 
 
 
-  def preprocess_amount_graph(self,amount,action):
+  def preprocess_amount_graph(self,amount,action,fees):
       graph = self.graphs_dict[amount]
       src = self.src
       number_of_channels = len(self.trgs)
-      alphas = action[0:number_of_channels]
-      betas = action[number_of_channels:]
+      alphas = fees[0:number_of_channels]
+      betas = fees[number_of_channels:]
       for i,trg in enumerate(self.trgs) :
         if graph.has_edge(src, trg):
           graph[src][trg]['weight'] = alphas[i]*amount + betas[i]
@@ -212,17 +217,20 @@ class simulator():
 
 
 
-  def run_simulation(self, action):   # action = [alphas, betas] = [alpha1, ..., alphan, beta1, ..., betan]
+  def run_simulation(self, action,fees):   # action = [alphas, betas] = [alpha1, ..., alphan, beta1, ..., betan]
     output_transactions_dict = dict()
     for (count,amount,epsilon) in self.transaction_types:
-        trs = self.run_simulation_for_each_transaction_type(count, amount, epsilon ,action)
+        trs = self.run_simulation_for_each_transaction_type(count, amount, epsilon ,action,fees)
         output_transactions_dict[amount] = trs
     return output_transactions_dict
    
 
 
   def run_simulation_for_each_transaction_type(self, count, amount, epsilon, action):  
-      graph = self.preprocess_amount_graph(amount, action)
+    
+    # add a function to add new channels or update previous ones before going ahead
+    
+      graph = self.preprocess_amount_graph(amount, action,fees)
 
       #Run Transactions
       if self.fixed_transactions : 
