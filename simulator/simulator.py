@@ -106,19 +106,12 @@ class simulator():
           self.graphs_dict[amount] = graph
             
     
-  
-
-  def add_to_active_channels(self,src,action):
-    for x,y in zip(actions[:midpoint],actions[midpoint:]):
-      
-
 
   def update_active_channels(self, src, trg, transaction_amount):
       if self.is_active_channel(src,trg) :
         self.active_channels[(src,trg)][0] = self.active_channels[(src,trg)][0] - transaction_amount
         self.active_channels[(trg,src)][0] = self.active_channels[(trg,src)][0] + transaction_amount
         
-
 
 
   def update_network_data(self, path, transaction_amount):
@@ -169,6 +162,28 @@ class simulator():
         self.active_channels[(src,trg)][2] = beta
 
 
+#   def set_new_channels(self,action,fees) : # fees = 2(n_channels,)
+#     n = len(self.trgs)
+#     alphas = fees[0:n]
+#     betas = fees[n:]
+#     midpoint = len(action)/2
+#     for trg,capacity in zip(action[:midpoint],action[midpoint:]):
+# #TODO: #5 needs to be changed
+#       if self.is_active_channel(src,trg) :
+#         self.active_channels[(src,trg)] = [capacity/2,-1,-1]
+#         self.active_channels[(trg,src)] = [capacity/2,-1,-1]
+#       else:
+#         self.active_channels[(src,trg)] = [capacity/2,-1,-1]
+#         self.active_channels[(trg,src)] = [capacity/2,-1,-1]
+      
+    # src = self.src
+    # for i,trg in enumerate(action[:midpoint]):
+    #     self.network_dictionary[(src,trg)][1] = alphas[i]
+    #     self.network_dictionary[(src,trg)][2] = betas[i]
+    #     if self.is_active_channel(src,trg) :
+    #       self.active_channels[(src,trg)][1] = alphas[i]
+    #       self.active_channels[(src,trg)][2] = betas[i]
+          
   def set_channels_fees(self,fees) : # fees = [alpha1, alpha2, ..., alphan, beta1, beta2, ..., betan] ~ action
     n = len(self.trgs)
     alphas = fees[0:n]
@@ -204,6 +219,7 @@ class simulator():
 
 
   def preprocess_amount_graph(self,amount,action,fees):
+      
       graph = self.graphs_dict[amount]
       src = self.src
       number_of_channels = len(self.trgs)
