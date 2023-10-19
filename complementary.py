@@ -70,6 +70,8 @@ def create_edge_attributes_dict(channel_id, capacity, fee_base_msat, fee_rate_mi
 
 ## defining channel fees
 ## NOTE: is it needed?
+## TODO: we should return a array instead of a Graph to initialize 
+# our new channel fees like [a0_,a1_,....,b0_,b1_,....]
 
 def initiate_fees(directed_edges, approach='half'):
     '''
@@ -116,9 +118,80 @@ def set_channels_fees(edges, src, trgs, channel_ids, static_fee_base_msat, stati
         return edges
     else:
         print("Error : Invalid Input Length")
-## defining action space
+
+# return [alpha_0,....,alpha_n,beta_0,....,beta_n] for fees.
+def calculate_fees(src,trgs,graph):
+  ##TODO
+  return fees
+
+## in simulator.py add a function to add our new channels to active channels.
+
+def add_to_active_channels(self,src,action):
+    midpoint = len(action)/2
+    trg = action[:midpoint]
+    for x,y in zip(action[:midpoint],action[midpoint:]):
+        self.active_channels[(src,trg)][0] = self.active_channels[(src,trg)][0]
+        self.active_channels[(trg,src)][0] = self.active_channels[(trg,src)][0]
+
+## def to trnsform capacities indesx(selected in action space) to values of capacities
+def action_fix_index_to_capacity(capacities,action):
+  midpoint = len(action) // 2
+  for i in action[midpoint:]:
+    action[i] = capacities[i]
+  return action
+
+## defining action space & edit of step function in multi channel
+## first n_channels are id's  of connected nodes and the seconds are corresponidg  capacities
+## add self.capacities to the fields of env class
+
+self.capacities = [50000, 100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000,
+                           1000000, 2000000, 3000000, 4000000, 5000000, 6000000, 7000000, 8000000, 9000000, 10000000] # mSAT
+
+self.action_space = MultiDiscrete([self.n_nodes for _ in range(self.n_channel)] + [len(self.capacities) for _ in range(self.n_channel)])
+
+def step(self, action):
+    # Execute one time step within the environment
+    # The second part of the action is action[midpoint:]
+    action = action_fix_index_to_capacity(self.capacities,action)
+    midpoint = len(action) // 2
+    sum_second_part = np.sum(action[midpoint:])
+    balances, transaction_amounts, transaction_numbers = self.simulate_transactions(action)
+    if sum_second_part > self.maximum_capacity:
+        reward = -np.inf
+    else:
+        # Running simulator for a certain time interval
+        # fees =????
+        reward = 1e-6 * np.sum(np.multiply(fees[0:self.n_channel], transaction_amounts) + \
+                        np.multiply(fees[self.n_channel:2 * self.n_channel], transaction_numbers))
+
+    self.time_step += 1
+    info = {'TimeLimit.truncated': True if self.time_step >= self.max_episode_length else False}
+    done = self.time_step >= self.max_episode_length
+    self.state = np.append(balances, transaction_amounts)/1000
+
+    return self.state, reward, done, info
+
 
 ## defining observation space
+# The observation is a ndarray with shape (2*n_nodes + 2*n_channels,). The first part of the observation space is 2*n_nodes with the values of 0 or 1, indicating whether we connect a channel with it or not.
+#The second part is 2*n_channels with the values corresponding to the balance of each channel and also accumulative transaction amounts in each time step.
+#Please note that the dimensions for balance and transaction amounts start from n_nodes and n_nodes + n_channels respectively. This allows us to separate the node connection information from the channel balance and transaction amounts.
+n_nodes = ... # number of nodes
+n_channels = ... # number of channels
+maximum_balance = ... # maximum balance
+max_transaction_amount = ... # maximum transaction amount
+
+# Define the bounds for each part of the observation space
+node_bounds = [2] * (2 * n_nodes) # values can be 0 or 1
+channel_balance_bounds = [maximum_balance] * n_channels # values can be between 0 and maximum_balance
+transaction_amount_bounds = [max_transaction_amount] * n_channels # values can be between 0 and max_transaction_amount
+
+# Combine the bounds
+bounds = node_bounds + channel_balance_bounds + transaction_amount_bounds
+
+# Create the observation space
+self.observation_space = spaces.MultiDiscrete(bounds)
+
 
 ## initially adding the first channel, which is connected to a hub
 
