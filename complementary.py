@@ -329,13 +329,6 @@ def preprocess_amount_graph(self,amount,fees):
       self.graphs_dict[amount] = graph
       return graph
 
-def action_fix_index_to_capacity(capacities,action):
-  midpoint = len(action) // 2
-  for i in action[midpoint:]:
-    action[i] = capacities[i]
-  return action
-
-
 
 
 
