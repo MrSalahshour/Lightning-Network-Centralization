@@ -1,4 +1,5 @@
 import numpy as np
+import secrets
 import stable_baselines3
 import sb3_contrib
 from simulator import preprocessing
@@ -49,7 +50,7 @@ def make_env(data, env_params, seed):
     return env
 
 
-def load_data(node, directed_edges_path, providers_path, local_size, manual_balance, initial_balances, capacities):
+def load_data(node, directed_edges_path, providers_path, local_size, number_of_channels):
     """
     :return:
     data = dict{src: node chosen for simulation  (default: int)
@@ -66,32 +67,26 @@ def load_data(node, directed_edges_path, providers_path, local_size, manual_bala
     """
     print('==================Loading Network Data==================')
     data = {}
-    src_index = node
+    #TODO #6:
+    # src_index = node 
+    src = generate_hex_string(64)
     subgraph_radius = 2
     data['providers'] = preprocessing.get_providers(providers_path)
     directed_edges = preprocessing.get_directed_edges(directed_edges_path)
-    data['src'], data['trgs'], data['channel_ids'], n_channels = preprocessing.select_node(directed_edges, src_index)
-    #TODO: #1 change the following 2 lines
-    data['capacities'] = [153243, 8500000, 4101029, 5900000, 2500000, 7000000]
-    data['initial_balances'] = [153243 / 2, 8500000 / 2, 4101029 / 2, 5900000 / 2, 2500000 / 2, 7000000 / 2]
-    
-    
-    
+    data['src'], data['trgs'], data['channel_ids'] = preprocessing.create_node(directed_edges, src, number_of_channels)
+
     channels = []
     for trg in data['trgs']:
         channels.append((data['src'], trg))
     data['active_channels'], \
     data['network_dictionary'], \
     data['node_variables'], \
-    data['active_providers'], \
-    data['initial_balances'], \
-    data['capacities'] = preprocessing.get_init_parameters(data['providers'],
+    data['active_providers'] = preprocessing.get_init_parameters(data['providers'],
                                                            directed_edges,
                                                            data['src'], data['trgs'],
                                                            data['channel_ids'],
                                                            channels,
-                                                           local_size,
-                                                           manual_balance, initial_balances, capacities)
+                                                           local_size)
     return data
 
 
@@ -206,3 +201,14 @@ def load_localized_model(radius, path):
     from stable_baselines3 import PPO
     model = PPO.load(path=path)
     return model
+
+##NOTE: This function is needed for generating node hash string which is 
+# used in data frame for adding new channels.
+# (use src hash for origin of channel and trg dor destination)
+
+def generate_hex_string(length):
+    return secrets.token_hex(length)
+
+# Generate a 64-byte (128 character) random hexadecimal string
+hex_string = generate_hex_string(64)
+print(hex_string)

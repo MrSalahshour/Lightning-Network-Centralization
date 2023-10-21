@@ -1,5 +1,5 @@
 import gym
-from gym import spaces
+from gym.spaces import *
 from gym.utils import seeding
 import numpy as np
 
@@ -55,27 +55,54 @@ class FeeEnv(gym.Env):
 
     def __init__(self, data, fee_base_upper_bound, max_episode_length, number_of_transaction_types, counts, amounts, epsilons, seed):
         # Source node
-        self.src = data['src']
+        self.n_nodes = len(data['trgs'].unique())
+        self.src = data['src'] 
         self.trgs = data['trgs']
         self.n_channel = len(self.trgs)
         print('actione dim:', 2 * self.n_channel)
 
         # Base fee and fee rate for each channel of src
-        self.action_space = spaces.Box(low=-1, high=+1, shape=(2 * self.n_channel,), dtype=np.float32)
-        self.fee_rate_upper_bound = 1000
-        self.fee_base_upper_bound = fee_base_upper_bound
 
-        # Balance and transaction amount of each channel
-        self.observation_space = spaces.Box(low=0, high=np.inf, shape=(2 * self.n_channel,), dtype=np.float32)
+        ## defining action space & edit of step function in multi channel
+        ## first n_channels are id's  of connected nodes and the seconds are corresponidg  capacities
+        ## add self.capacities to the fields of env class
+         
+        #TODO #8:
+        self.capacities = [50000, 100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000,
+                                1000000, 2000000, 3000000, 4000000, 5000000, 6000000, 7000000, 8000000, 9000000, 10000000] # mSAT
+
+        self.action_space = MultiDiscrete([self.n_nodes for _ in range(self.n_channel)] + [len(self.capacities) for _ in range(self.n_channel)])
+        
+        #TODO #9:
+        # self.fee_rate_upper_bound = 1000
+        # self.fee_base_upper_bound = fee_base_upper_bound
+        
+
+        # defining observation space
+        # The observation is a ndarray with shape (n_nodes + 2*n_channels,). The first part of the observation space is 2*n_nodes with the values of 0 or 1, indicating whether we connect a channel with it or not.
+        #The second part is 2*n_channels with the values corresponding to the balance of each channel and also accumulative transaction amounts in each time step.
+        #Please note that the dimensions for balance and transaction amounts start from n_nodes and n_nodes + n_channels respectively. This allows us to separate the node connection information from the channel balance and transaction amounts.
+        maximum_balance = ... # maximum balance
+        max_transaction_amount = ... # maximum transaction amount
+
+        # Define the bounds for each part of the observation space
+        node_bounds = [2] * (self.n_nodes) # values can be 0 or 1
+        # Create the observation space
+        multi_discrete_space = MultiDiscrete(node_bounds)
+        box_space = Box(low=0, high=np.inf, shape=(2 * self.n_channel,), dtype=np.float32)
+        self.observation_space = Dict({
+            'multi_discrete': multi_discrete_space,
+            'box': box_space
+            })
 
         # Initial values of each channel
-        self.initial_balances = data['initial_balances']
-        self.capacities = data['capacities']
-        self.state = np.append(self.initial_balances, np.zeros(shape=(self.n_channel,)))
+        # self.initial_balances = data['initial_balances']
+        # self.capacities = data['capacities']
+        self.state = np.append(np.zeros(shape=(self.n_nodes,)),np.zeros(shape=(self.n_channel,)), np.zeros(shape=(self.n_channel,)))
 
         self.time_step = 0
         self.max_episode_length = max_episode_length
-        self.balance_ratio = 0.1
+        # self.balance_ratio = 0.1
 
         # Simulator
         transaction_types = generate_transaction_types(number_of_transaction_types, counts, amounts,
@@ -101,12 +128,12 @@ class FeeEnv(gym.Env):
 
     def step(self, action, rescale=True):
         # Rescaling the action vector
-        if rescale:
-            action[0:self.n_channel] = .5 * self.fee_rate_upper_bound * action[0:self.n_channel] + \
-                                       .5 * self.fee_rate_upper_bound
-            action[self.n_channel:2 * self.n_channel] = .5 * self.fee_base_upper_bound * action[
-                                                                                         self.n_channel:2 * self.n_channel] + \
-                                                        .5 * self.fee_base_upper_bound
+        # if rescale:
+        #     action[0:self.n_channel] = .5 * self.fee_rate_upper_bound * action[0:self.n_channel] + \
+        #                                .5 * self.fee_rate_upper_bound
+        #     action[self.n_channel:2 * self.n_channel] = .5 * self.fee_base_upper_bound * action[
+        #                                                                                  self.n_channel:2 * self.n_channel] + \
+        #                                                 .5 * self.fee_base_upper_bound
 
         # Running simulator for a certain time interval
         balances, transaction_amounts, transaction_numbers = self.simulate_transactions(action)

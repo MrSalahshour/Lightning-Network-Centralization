@@ -68,6 +68,8 @@ def create_edge_attributes_dict(channel_id, capacity, fee_base_msat, fee_rate_mi
 
     return edge_attributes
 
+## defining channel fees
+## NOTE: is it needed?
 
 def initiate_fees(directed_edges, approach='half'):
     '''
@@ -114,9 +116,55 @@ def set_channels_fees(edges, src, trgs, channel_ids, static_fee_base_msat, stati
         return edges
     else:
         print("Error : Invalid Input Length")
-## defining action space
 
-## defining observation space
+# return [alpha_0,....,alpha_n,beta_0,....,beta_n] for fees.
+def calculate_fees(src,trgs,graph):
+  ##TODO
+  return fees
+
+## in simulator.py add a function to add our new channels to active channels.
+
+def add_to_active_channels(self,src,action):
+    midpoint = len(action)/2
+    trg = action[:midpoint]
+    for x,y in zip(action[:midpoint],action[midpoint:]):
+        self.active_channels[(src,trg)][0] = self.active_channels[(src,trg)][0]
+        self.active_channels[(trg,src)][0] = self.active_channels[(trg,src)][0]
+
+## def to trnsform capacities indesx(selected in action space) to values of capacities
+def action_fix_index_to_capacity(capacities,action):
+  midpoint = len(action) // 2
+  for i in action[midpoint:]:
+    action[i] = capacities[i]
+  return action
+
+
+
+def step(self, action):
+    # Execute one time step within the environment
+    # The second part of the action is action[midpoint:]
+    action = action_fix_index_to_capacity(self.capacities,action)
+    midpoint = len(action) // 2
+    sum_second_part = np.sum(action[midpoint:])
+    balances, transaction_amounts, transaction_numbers = self.simulate_transactions(action)
+    if sum_second_part > self.maximum_capacity:
+        reward = -np.inf
+    else:
+        # Running simulator for a certain time interval
+        # fees =????
+        reward = 1e-6 * np.sum(np.multiply(fees[0:self.n_channel], transaction_amounts) + \
+                        np.multiply(fees[self.n_channel:2 * self.n_channel], transaction_numbers))
+
+    self.time_step += 1
+    info = {'TimeLimit.truncated': True if self.time_step >= self.max_episode_length else False}
+    done = self.time_step >= self.max_episode_length
+    self.state = np.append(balances, transaction_amounts)/1000
+
+    return self.state, reward, done, info
+
+
+#
+
 
 ## initially adding the first channel, which is connected to a hub
 
@@ -205,7 +253,7 @@ def calculate_fees(src,trgs,graph):
 
 # in multchannel.py we have this func that we get action for fees but in our work we should generate these fees another way (for example mean of lcal fees).
 # the fees should be like this [alpha_0,...alpha_n,beta_0,...beta_n]
-    def simulate_transactions(self, action, fees):
+def simulate_transactions(self, action, fees):
         self.simulator.set_channels_fees(fees)
 
         output_transactions_dict = self.simulator.run_simulation(action)
@@ -215,7 +263,7 @@ def calculate_fees(src,trgs,graph):
 
 
 # so in simulator.py the func get_simulation_results should be like this :
-  def get_simulation_results(self, output_transactions_dict):
+def get_simulation_results(self, output_transactions_dict):
         channels_balances = []
         channels_ks = []
         channels_txs = []
@@ -232,7 +280,7 @@ def calculate_fees(src,trgs,graph):
 
 # in simulator.py (th action space in  the previous was to choose alphas and betas and after setting these values you calculate
  # the reward but in our work we set channels an their capacity so ew should change these and then calculate the reward)
-  def preprocess_amount_graph(self,amount,fees):
+def preprocess_amount_graph(self,amount,fees):
       graph = self.graphs_dict[amount]
       src = self.src
       self.trgs = action[0:number_of_channels]
@@ -256,57 +304,18 @@ def calculate_fees(src,trgs,graph):
       self.graphs_dict[amount] = graph
       return graph
 
-def action_fix_index_to_capacity(capacities,action):
-  midpoint = len(action) // 2
-  for i in action[midpoint:]:
-    action[i] = capacities[i]
-  return action
 
-## defining action space & edit of step function in multi channel
-## first n_channels are id's  of connected nodes and the seconds are corresponidg  capacities
 
-self.capacities = [50000, 100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000,
-                           1000000, 2000000, 3000000, 4000000, 5000000, 6000000, 7000000, 8000000, 9000000, 10000000] # mSAT
 
-self.action_space = MultiDiscrete([self.n_nodes for _ in range(self.n_channel)] + [len(self.capacities) for _ in range(self.n_channel)])
 
-    def step(self, action):
-        # Execute one time step within the environment
-        # The second part of the action is action[midpoint:]
-        action = action_fix_index_to_capacity(self.capacities,action)
-        midpoint = len(action) // 2
-        sum_second_part = np.sum(action[midpoint:])
-        balances, transaction_amounts, transaction_numbers = self.simulate_transactions(action)
-        if sum_second_part > self.maximum_capacity:
-            reward = -np.inf
-        else:
-          # Running simulator for a certain time interval
-          # fees =????
-          reward = 1e-6 * np.sum(np.multiply(fees[0:self.n_channel], transaction_amounts) + \
-                        np.multiply(fees[self.n_channel:2 * self.n_channel], transaction_numbers))
 
-        self.time_step += 1
-        info = {'TimeLimit.truncated': True if self.time_step >= self.max_episode_length else False}
-        done = self.time_step >= self.max_episode_length
-        self.state = np.append(balances, transaction_amounts)/1000
 
-        return self.state, reward, done, info
 
-## defining observation space
-# The observation is a ndarray with shape (2*n_nodes + 2*n_channels,). The first part of the observation space is 2*n_nodes with the values of 0 or 1, indicating whether we connect a channel with it or not.
-#The second part is 2*n_channels with the values corresponding to the balance of each channel and also accumulative transaction amounts in each time step.
-#Please note that the dimensions for balance and transaction amounts start from n_nodes and n_nodes + n_channels respectively. This allows us to separate the node connection information from the channel balance and transaction amounts.
 
-self.observation_space = spaces.Box(low=0, high=np.inf, shape=(self.n_nodes+2 * self.n_channel,), dtype=np.float32)
-self.action_space = MultiDiscrete([self.n_nodes for _ in range(self.n_channel)] + [len(self.capacities) for _ in range(self.n_channel)])
+
+
 
 ## add src node to dataset. in previous work, the source node would be chosen randmoly from graph
 
 ## initially adding the first channel, which is connected to a hub
 
-## in simulator.py add a function to add our new channels to active channels.
-
-  def add_to_active_channels(self,src,action):
-    for x,y in zip(actions[:midpoint],actions[midpoint:]):
-        self.active_channels[(src,trg)][0] = self.active_channels[(src,trg)][0]
-        self.active_channels[(trg,src)][0] = self.active_channels[(trg,src)][0]
