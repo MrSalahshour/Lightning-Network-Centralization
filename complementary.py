@@ -138,14 +138,7 @@ def action_fix_index_to_capacity(capacities,action):
     action[i] = capacities[i]
   return action
 
-## defining action space & edit of step function in multi channel
-## first n_channels are id's  of connected nodes and the seconds are corresponidg  capacities
-## add self.capacities to the fields of env class
 
-self.capacities = [50000, 100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000,
-                           1000000, 2000000, 3000000, 4000000, 5000000, 6000000, 7000000, 8000000, 9000000, 10000000] # mSAT
-
-self.action_space = MultiDiscrete([self.n_nodes for _ in range(self.n_channel)] + [len(self.capacities) for _ in range(self.n_channel)])
 
 def step(self, action):
     # Execute one time step within the environment
@@ -170,25 +163,7 @@ def step(self, action):
     return self.state, reward, done, info
 
 
-## defining observation space
-# The observation is a ndarray with shape (2*n_nodes + 2*n_channels,). The first part of the observation space is 2*n_nodes with the values of 0 or 1, indicating whether we connect a channel with it or not.
-#The second part is 2*n_channels with the values corresponding to the balance of each channel and also accumulative transaction amounts in each time step.
-#Please note that the dimensions for balance and transaction amounts start from n_nodes and n_nodes + n_channels respectively. This allows us to separate the node connection information from the channel balance and transaction amounts.
-n_nodes = ... # number of nodes
-n_channels = ... # number of channels
-maximum_balance = ... # maximum balance
-max_transaction_amount = ... # maximum transaction amount
-
-# Define the bounds for each part of the observation space
-node_bounds = [2] * (2 * n_nodes) # values can be 0 or 1
-channel_balance_bounds = [maximum_balance] * n_channels # values can be between 0 and maximum_balance
-transaction_amount_bounds = [max_transaction_amount] * n_channels # values can be between 0 and max_transaction_amount
-
-# Combine the bounds
-bounds = node_bounds + channel_balance_bounds + transaction_amount_bounds
-
-# Create the observation space
-self.observation_space = spaces.MultiDiscrete(bounds)
+#
 
 
 ## initially adding the first channel, which is connected to a hub
@@ -328,6 +303,14 @@ def preprocess_amount_graph(self,amount,fees):
           graph[src][trg]['weight'] = alphas[i]*amount + betas[i]
       self.graphs_dict[amount] = graph
       return graph
+
+
+
+
+
+
+
+
 
 
 
