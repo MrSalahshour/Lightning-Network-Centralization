@@ -67,7 +67,6 @@ class simulator():
     graph = nx.DiGraph()
     for key in self.network_dictionary :
       val = self.network_dictionary[key]
-      #val[0] tends to be balance while val[1] and val[2] are fee_base and fee_rate
       if val[0] > amount :
           graph.add_edge(key[0],key[1],weight = val[1]*amount + val[2])
     
@@ -106,12 +105,15 @@ class simulator():
           self.graphs_dict[amount] = graph
             
     
+  
+
 
   def update_active_channels(self, src, trg, transaction_amount):
       if self.is_active_channel(src,trg) :
         self.active_channels[(src,trg)][0] = self.active_channels[(src,trg)][0] - transaction_amount
         self.active_channels[(trg,src)][0] = self.active_channels[(trg,src)][0] + transaction_amount
         
+
 
 
   def update_network_data(self, path, transaction_amount):
@@ -162,28 +164,6 @@ class simulator():
         self.active_channels[(src,trg)][2] = beta
 
 
-#   def set_new_channels(self,action,fees) : # fees = 2(n_channels,)
-#     n = len(self.trgs)
-#     alphas = fees[0:n]
-#     betas = fees[n:]
-#     midpoint = len(action)/2
-#     for trg,capacity in zip(action[:midpoint],action[midpoint:]):
-# #TODO: #5 needs to be changed
-#       if self.is_active_channel(src,trg) :
-#         self.active_channels[(src,trg)] = [capacity/2,-1,-1]
-#         self.active_channels[(trg,src)] = [capacity/2,-1,-1]
-#       else:
-#         self.active_channels[(src,trg)] = [capacity/2,-1,-1]
-#         self.active_channels[(trg,src)] = [capacity/2,-1,-1]
-      
-    # src = self.src
-    # for i,trg in enumerate(action[:midpoint]):
-    #     self.network_dictionary[(src,trg)][1] = alphas[i]
-    #     self.network_dictionary[(src,trg)][2] = betas[i]
-    #     if self.is_active_channel(src,trg) :
-    #       self.active_channels[(src,trg)][1] = alphas[i]
-    #       self.active_channels[(src,trg)][2] = betas[i]
-          
   def set_channels_fees(self,fees) : # fees = [alpha1, alpha2, ..., alphan, beta1, beta2, ..., betan] ~ action
     n = len(self.trgs)
     alphas = fees[0:n]
@@ -218,8 +198,22 @@ class simulator():
 
 
 
-  def preprocess_amount_graph(self,amount,action,fees):
-      
+  def preprocess_amount_graph(self,amount,action):
+      graph = self.graphs_dict[amount]
+      src = self.src
+      number_of_channels = len(self.trgs)
+      alphas = action[0:number_of_channels]
+      betas = action[number_of_channels:]
+      for i,trg in enumerate(self.trgs) :
+        if graph.has_edge(src, trg):
+          graph[src][trg]['weight'] = alphas[i]*amount + betas[i]
+      self.graphs_dict[amount] = graph
+      return graph
+  
+  
+  #NOTE: first commit:
+    '''
+    def preprocess_amount_graph(self,amount,action, fees):
       graph = self.graphs_dict[amount]
       src = self.src
       number_of_channels = len(self.trgs)
@@ -229,24 +223,33 @@ class simulator():
         if graph.has_edge(src, trg):
           graph[src][trg]['weight'] = alphas[i]*amount + betas[i]
       self.graphs_dict[amount] = graph
-      return graph
+      return graph                                                                                    output_transactions_dict)
+
+    '''
 
 
 
-  def run_simulation(self, action,fees):   # action = [alphas, betas] = [alpha1, ..., alphan, beta1, ..., betan]
+  def run_simulation(self, action):   # action = [alphas, betas] = [alpha1, ..., alphan, beta1, ..., betan]
     output_transactions_dict = dict()
     for (count,amount,epsilon) in self.transaction_types:
-        trs = self.run_simulation_for_each_transaction_type(count, amount, epsilon ,action,fees)
+        trs = self.run_simulation_for_each_transaction_type(count, amount, epsilon ,action)
         output_transactions_dict[amount] = trs
     return output_transactions_dict
    
+   
+#NOTE: first commit:
+    '''
+    def run_simulation(self, action, fees):   # action = [alphas, betas] = [alpha1, ..., alphan, beta1, ..., betan]
+    output_transactions_dict = dict()
+    for (count,amount,epsilon) in self.transaction_types:
+        trs = self.run_simulation_for_each_transaction_type(count, amount, epsilon ,action, fees)
+        output_transactions_dict[amount] = trs
+    return output_transactions_dict
+    '''
 
 
   def run_simulation_for_each_transaction_type(self, count, amount, epsilon, action):  
-    
-    # add a function to add new channels or update previous ones before going ahead
-    
-      graph = self.preprocess_amount_graph(amount, action,fees)
+      graph = self.preprocess_amount_graph(amount, action)
 
       #Run Transactions
       if self.fixed_transactions : 

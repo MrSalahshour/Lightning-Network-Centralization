@@ -1,5 +1,6 @@
 import gym
-from gym.spaces import *
+from gym import spaces
+from gym import *
 from gym.utils import seeding
 import numpy as np
 
@@ -55,33 +56,42 @@ class FeeEnv(gym.Env):
 
     def __init__(self, data, fee_base_upper_bound, max_episode_length, number_of_transaction_types, counts, amounts, epsilons, seed):
         # Source node
-        self.n_nodes = len(data['trgs'].unique())
         self.src = data['src'] 
+        
+        
+        #NOTE: added attribute
+        self.n_nodes = len(data['trgs'].unique())
+        
+        
         self.trgs = data['trgs']
         self.n_channel = len(self.trgs)
         print('actione dim:', 2 * self.n_channel)
 
-        # Base fee and fee rate for each channel of src
+        #NOTE: following lines are for fee selection mode
+        # # Base fee and fee rate for each channel of src
+        # self.action_space = spaces.Box(low=-1, high=+1, shape=(2 * self.n_channel,), dtype=np.float32)
+        # self.fee_rate_upper_bound = 1000
+        # self.fee_base_upper_bound = fee_base_upper_bound
 
-        ## defining action space & edit of step function in multi channel
+        # # Balance and transaction amount of each channel
+        # self.observation_space = spaces.Box(low=0, high=np.inf, shape=(2 * self.n_channel,), dtype=np.float32)
+
+         ## defining action space & edit of step function in multi channel
         ## first n_channels are id's  of connected nodes and the seconds are corresponidg  capacities
         ## add self.capacities to the fields of env class
-         
+
         #TODO #8:
         self.capacities = [50000, 100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000,
                                 1000000, 2000000, 3000000, 4000000, 5000000, 6000000, 7000000, 8000000, 9000000, 10000000] # mSAT
 
         self.action_space = MultiDiscrete([self.n_nodes for _ in range(self.n_channel)] + [len(self.capacities) for _ in range(self.n_channel)])
-        
-        #TODO #9:
-        # self.fee_rate_upper_bound = 1000
-        # self.fee_base_upper_bound = fee_base_upper_bound
-        
 
-        # defining observation space
+
+        #NOTE: defining observation space
         # The observation is a ndarray with shape (n_nodes + 2*n_channels,). The first part of the observation space is 2*n_nodes with the values of 0 or 1, indicating whether we connect a channel with it or not.
         #The second part is 2*n_channels with the values corresponding to the balance of each channel and also accumulative transaction amounts in each time step.
         #Please note that the dimensions for balance and transaction amounts start from n_nodes and n_nodes + n_channels respectively. This allows us to separate the node connection information from the channel balance and transaction amounts.
+        
         maximum_balance = ... # maximum balance
         max_transaction_amount = ... # maximum transaction amount
 
@@ -94,14 +104,16 @@ class FeeEnv(gym.Env):
             'multi_discrete': multi_discrete_space,
             'box': box_space
             })
-
-        # Initial values of each channel
+            
+        # Initial values of each channel for fee selection mode
         # self.initial_balances = data['initial_balances']
         # self.capacities = data['capacities']
+        # self.state = np.append(self.initial_balances, np.zeros(shape=(self.n_channel,)))
         self.state = np.append(np.zeros(shape=(self.n_nodes,)),np.zeros(shape=(self.n_channel,)), np.zeros(shape=(self.n_channel,)))
 
         self.time_step = 0
         self.max_episode_length = max_episode_length
+        # for fee selection
         # self.balance_ratio = 0.1
 
         # Simulator
@@ -127,7 +139,7 @@ class FeeEnv(gym.Env):
 
 
     def step(self, action, rescale=True):
-        # Rescaling the action vector
+        # Rescaling the action vector (fee selection mode)
         # if rescale:
         #     action[0:self.n_channel] = .5 * self.fee_rate_upper_bound * action[0:self.n_channel] + \
         #                                .5 * self.fee_rate_upper_bound
@@ -150,14 +162,26 @@ class FeeEnv(gym.Env):
 
         return self.state, reward, done, info
 
-    def simulate_transactions(self, action,fees):
+    def simulate_transactions(self, action):
         self.simulator.set_channels_fees(action)
 
-        output_transactions_dict = self.simulator.run_simulation(action,fees)
+        output_transactions_dict = self.simulator.run_simulation(action)
         balances, transaction_amounts, transaction_numbers = self.simulator.get_simulation_results(action,
                                                                                                    output_transactions_dict)
 
         return balances, transaction_amounts, transaction_numbers
+    
+    #NOTE: first commit:
+    '''
+    def simulate_transactions(self, action):
+    
+        self.simulator.set_channel_fees(action)
+        
+        output_transactions_dict = self.simulator.run_simulation(action, fees)
+        balances, transaction_amounts, transaction_numbers = self.simulator.get_simulation_results(action,
+                                                                                                   output_transactions_dict)
+
+    '''
 
     def reset(self):
         print('episode ended!')

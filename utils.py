@@ -1,7 +1,7 @@
 import numpy as np
-import secrets
 import stable_baselines3
 import sb3_contrib
+import secrets
 from simulator import preprocessing
 from env.multi_channel import FeeEnv
 
@@ -50,10 +50,11 @@ def make_env(data, env_params, seed):
     return env
 
 
-def load_data(node, directed_edges_path, providers_path, local_size, number_of_channels):
+def load_data(mode, node, directed_edges_path, providers_path, local_size, manual_balance, initial_balances, capacities, n_channels):
     """
     :return:
-    data = dict{src: node chosen for simulation  (default: int)
+    data = dict{mode: Levin is used for different modes: fee_selection, channel_openning (default: String)
+                src: node chosen for simulation  (default: int)
                 trgs: nodes src is connected to  (default: list)
                 channel_ids: channel ids of src node [NOT USED YET]  (default: list)
                 initial_balances: initial distribution of capacity of each channel  (default: list)
@@ -63,30 +64,41 @@ def load_data(node, directed_edges_path, providers_path, local_size, number_of_c
                 active_providers: Merchants of the local network around src  (default: ?)
                 active_channels: channel which their balances are being updated each timestep  (default: ?)
                 network_dictionary: whole network data  (default: dict)
+                n_channels: number of channels within data (default:int)
             }
     """
     print('==================Loading Network Data==================')
     data = {}
+    # for fee selection mode
+    # src_index = node
+    
     #TODO #6:
-    # src_index = node 
     src = generate_hex_string(64)
+    
     subgraph_radius = 2
     data['providers'] = preprocessing.get_providers(providers_path)
     directed_edges = preprocessing.get_directed_edges(directed_edges_path)
-    data['src'], data['trgs'], data['channel_ids'] = preprocessing.create_node(directed_edges, src, number_of_channels)
-
+    # for fee selection mode
+    # data['src'], data['trgs'], data['channel_ids'], n_channels = preprocessing.select_node(directed_edges, src_index)
+    # data['capacities'] = [153243, 8500000, 4101029, 5900000, 2500000, 7000000]
+    # data['initial_balances'] = [153243 / 2, 8500000 / 2, 4101029 / 2, 5900000 / 2, 2500000 / 2, 7000000 / 2]
+    
+    data['src'], data['trgs'], data['channel_ids'] = preprocessing.create_node(directed_edges, src, n_channels)
     channels = []
     for trg in data['trgs']:
         channels.append((data['src'], trg))
     data['active_channels'], \
     data['network_dictionary'], \
     data['node_variables'], \
-    data['active_providers'] = preprocessing.get_init_parameters(data['providers'],
+    data['active_providers'], \
+    data['initial_balances'], \
+    data['capacities'] = preprocessing.get_init_parameters(data['providers'],
                                                            directed_edges,
                                                            data['src'], data['trgs'],
                                                            data['channel_ids'],
                                                            channels,
-                                                           local_size)
+                                                           local_size,
+                                                           manual_balance, initial_balances, capacities)
     return data
 
 
@@ -208,7 +220,3 @@ def load_localized_model(radius, path):
 
 def generate_hex_string(length):
     return secrets.token_hex(length)
-
-# Generate a 64-byte (128 character) random hexadecimal string
-hex_string = generate_hex_string(64)
-print(hex_string)
