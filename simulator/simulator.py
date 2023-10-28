@@ -63,10 +63,15 @@ class simulator():
 
 
   def generate_graph(self, amount):
+    '''Description: for each transaction_type, outputs a subgraph
+                    in which the relevant transactions can flow.
+
+    '''
     self.sync_network_dictionary()
     graph = nx.DiGraph()
     for key in self.network_dictionary :
       val = self.network_dictionary[key]
+      # val[0] represents balance key[0] src and key[1] target, val[1] is fee_base and val[2] is fee_rate
       if val[0] > amount :
           graph.add_edge(key[0],key[1],weight = val[1]*amount + val[2])
     
@@ -75,6 +80,11 @@ class simulator():
 
 
   def generate_graphs_dict(self, transaction_types):
+    '''
+    Description: generates subgraph for each transaction_type.
+    ]            This is done during each iteration.
+                 
+    '''
     graph_dicts = dict()
     for (count, amount, epsilon) in transaction_types :
         graph = self.generate_graph(amount)
@@ -163,8 +173,8 @@ class simulator():
         self.active_channels[(src,trg)][1] = alpha
         self.active_channels[(src,trg)][2] = beta
 
-
-  def set_channels_fees(self,fees) : # fees = [alpha1, alpha2, ..., alphan, beta1, beta2, ..., betan] ~ action
+  #TODO: #15 remember to utilize best approach for peer-fee setting
+  def set_channels_fees(self, mode, fees) : # fees = [alpha1, alpha2, ..., alphan, beta1, beta2, ..., betan] ~ action
     n = len(self.trgs)
     alphas = fees[0:n]
     betas = fees[n:]
@@ -175,6 +185,12 @@ class simulator():
         if self.is_active_channel(src,trg) :
           self.active_channels[(src,trg)][1] = alphas[i]
           self.active_channels[(src,trg)][2] = betas[i]
+        if mode == 'channel_openning':
+          self.network_dictionary[(trg,src)][1] = alphas[i]
+          self.network_dictionary[(trg,src)][2] = betas[i]
+          if self.is_active_channel(trg,src) :
+            self.active_channels[(trg,src)][1] = alphas[i]
+            self.active_channels[(trg,src)][2] = betas[i]
 
 
 

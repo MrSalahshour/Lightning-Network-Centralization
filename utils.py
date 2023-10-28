@@ -49,7 +49,7 @@ def make_env(data, env_params, seed):
 
     return env
 
-
+#TODO: #14 #13 mode to be set
 def load_data(mode, node, directed_edges_path, providers_path, local_size, manual_balance, initial_balances, capacities, n_channels):
     """
     :return:
