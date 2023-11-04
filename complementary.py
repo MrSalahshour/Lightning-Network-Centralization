@@ -25,7 +25,7 @@ def get_node_with_highest_betweenness_centrality(G):
     highest_betweenness_node = max(betweenness_centralities, key=betweenness_centralities.get)
 
     return highest_betweenness_node
-
+#TODO: #17 add this function to simulator, it will be called in STEP, in order to have the data when something external happens to  the process
 def add_edge_to_digraph(G: nx.DiGraph, source: any, target: any, edge_attrs: dict) -> nx.DiGraph:
     """
     Adds an edge between two nodes in a NetworkX DiGraph with the specified edge attributes.

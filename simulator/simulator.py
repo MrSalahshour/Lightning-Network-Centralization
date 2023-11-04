@@ -124,7 +124,73 @@ class simulator():
         self.active_channels[(trg,src)][0] = self.active_channels[(trg,src)][0] + transaction_amount
         
 
+  def update_network_and_active_channels(self, action, prev_action):
+    additive_budget, additive_channels = self.delete_previous_action(self, action, prev_action)
+    additive_budget += self.add_to_network_and_active_channels(self, additive_channels)
+    
+    return additive_budget
+    
+    
+    
+  def delete_previous_action_differences(self, action, prev_action):
+    '''
+    In this function, channels of new action will be omited from the network iff they are old channels
+    with new assigned capacities or 0 capacity.
+    '''
+    budget = 0
+    midpoint = len(action) // 2
+    additive_idx = []
+    additive_bal = []
+    # trg, bals in action which are new
+    for trg, bal in zip(action[:midpoint], action[midpoint:]):
+      if (trg,bal) not in zip((prev_action[:midpoint], prev_action[midpoint:])):
+        additive_idx.append(trg)
+        additive_bal.append(bal)
+        
+        if trg in prev_action[:midpoint]:
+          budget += self.network_dictionary[(self.src, trg)][0]
+          del self.network_dictionary[(self.src, trg)]
+          del self.network_dictionary[(trg, self.src)]
+          
+          del self.active_channels[(self.src, trg)]
+          del self.active_channels[(trg, self.src)]
+          
+    # trgs in prev_action and not in action anymore      
+    for trg in prev_action[:midpoint]:
+      if trg not in action[:midpoint]:
+          budget += self.network_dictionary[(self.src, trg)][0]
+          del self.network_dictionary[(self.src, trg)]
+          del self.network_dictionary[(trg, self.src)]
+          
+          del self.active_channels[(self.src, trg)]
+          del self.active_channels[(trg, self.src)]
+        
+    
+    return budget, additive_idx+additive_bal
+    
+  def add_to_network_and_active_channels(self, additive_channels):
+    '''
+    In this function, channels of new action will be added to the network iff they are new channels
+    or have new capacities assigned.
+    '''
+    if ~additive_channels:
+      return 0
+    
+    midpoint = len(additive_channels) // 2
+    cumulative_budget = 0
+    for trg, bal in zip(additive_channels[:midpoint], additive_channels[midpoint:]):
+      self.network_dictionary[(self.src, trg)] = [bal, None, None, 2* bal]
+      self.network_dictionary[(trg, self.src)] = [bal, None, None, 2* bal]
+      
+      self.active_channels[(self.src, trg)] = self.network_dictionary[(self.src, trg)]
+      self.active_channels[(trg, self.src)] = self.network_dictionary[(trg, self.src)]
+      
+      cumulative_budget -= bal
+      
+    return cumulative_budget
 
+
+    
 
   def update_network_data(self, path, transaction_amount):
       for i in range(len(path)-1) :
@@ -141,7 +207,7 @@ class simulator():
     return ((src,trg) in self.active_channels)
         
 
-
+#TODO: #19 take a look at this for first lines of step function
   def onchain_rebalancing(self, onchain_rebalancing_amount, src, trg, channel_id):
     if self.is_active_channel(src,trg) :
       self.active_channels[(src,trg)][0] += onchain_rebalancing_amount  
@@ -211,10 +277,11 @@ class simulator():
     result_bit = 1
     info = {'successful'}
     return path, result_bit, info 
+  #TODO: #20 edges should be added to and deleted from digraph
+  def add_to_amount_graph(self):
+    
 
-
-
-  def preprocess_amount_graph(self,amount,action):
+  def preprocess_amount_graph(self,amount,action,):
       graph = self.graphs_dict[amount]
       src = self.src
       number_of_channels = len(self.trgs)

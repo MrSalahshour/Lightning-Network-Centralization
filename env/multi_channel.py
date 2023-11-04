@@ -54,7 +54,7 @@ class FeeEnv(gym.Env):
     We are adding the income from each payment to balance of the corresponding channel.
     """
 
-    def __init__(self, data, fee_base_upper_bound, max_episode_length, number_of_transaction_types, counts, amounts, epsilons, seed):
+    def __init__(self, data, max_capacity, fee_base_upper_bound, max_episode_length, number_of_transaction_types, counts, amounts, epsilons, seed):
         # Source node
         self.src = data['src'] 
         
@@ -67,6 +67,7 @@ class FeeEnv(gym.Env):
         self.n_channel = len(self.trgs)
         print('actione dim:', 2 * self.n_channel)
 
+        #TODO: #18 remember that following lines are to be used in if structure after the structure of mode is being implemented
         #NOTE: following lines are for fee selection mode
         # # Base fee and fee rate for each channel of src
         # self.action_space = spaces.Box(low=-1, high=+1, shape=(2 * self.n_channel,), dtype=np.float32)
@@ -80,6 +81,8 @@ class FeeEnv(gym.Env):
         ## first n_channels are id's  of connected nodes and the seconds are corresponidg  capacities
         ## add self.capacities to the fields of env class
 
+        #NOTE: the following line is the total budget for the model to utilize in CHANNEL_OPENNING mode
+        self.maximum_capacity = max_capacity
         #TODO #8:
         self.capacities = [50000, 100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000,
                                 1000000, 2000000, 3000000, 4000000, 5000000, 6000000, 7000000, 8000000, 9000000, 10000000] # mSAT
@@ -112,7 +115,7 @@ class FeeEnv(gym.Env):
         
         #
         self.state = np.append(np.zeros(shape=(self.n_nodes,)),np.zeros(shape=(self.n_channel,)), np.zeros(shape=(self.n_channel,)))
-
+            
         self.time_step = 0
         self.max_episode_length = max_episode_length
         # for fee selection
@@ -168,15 +171,25 @@ class FeeEnv(gym.Env):
     def step(self, action):
         # Execute one time step within the environment
         # The second part of the action is action[midpoint:]
-        
+            
         #TODO: #11 set reasonable fees
         fees = self.get_channel_fees
         action = self.action_fix_index_to_capacity(self.capacities,action)
         midpoint = len(action) // 2
         # updating trgs in simulator
         self.simulator.trgs = action[:midpoint]
-        sum_second_part = np.sum(action[midpoint:]) 
-        if sum_second_part > self.maximum_capacity:
+        
+        '''
+        In the following couple of lines, new channels are being added to the network, along with active_
+        _channels dict and also, channels not present anymore, will be deleted
+        '''
+        additive_budget = self.simulator.update_network_and_active_channels(action, self.prev_action)
+        self.prev_action = action
+        
+        self.maximum_capacity += additive_budget
+        
+        # sum_second_part = np.sum(action[midpoint:]) 
+        if self.maximum_capacity<0:
             reward = -np.inf
         
         else:
