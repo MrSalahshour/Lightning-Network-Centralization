@@ -69,17 +69,17 @@ class FeeEnv(gym.Env):
 
         #TODO: #18 remember that following lines are to be used in if structure after the structure of mode is being implemented
         #NOTE: following lines are for fee selection mode
-        # # Base fee and fee rate for each channel of src
-        # self.action_space = spaces.Box(low=-1, high=+1, shape=(2 * self.n_channel,), dtype=np.float32)
-        # self.fee_rate_upper_bound = 1000
-        # self.fee_base_upper_bound = fee_base_upper_bound
+        '''# Base fee and fee rate for each channel of src
+        self.action_space = spaces.Box(low=-1, high=+1, shape=(2 * self.n_channel,), dtype=np.float32)
+        self.fee_rate_upper_bound = 1000
+        self.fee_base_upper_bound = fee_base_upper_bound
 
-        # # Balance and transaction amount of each channel
-        # self.observation_space = spaces.Box(low=0, high=np.inf, shape=(2 * self.n_channel,), dtype=np.float32)
+        # Balance and transaction amount of each channel
+        self.observation_space = spaces.Box(low=0, high=np.inf, shape=(2 * self.n_channel,), dtype=np.float32)
 
-         ## defining action space & edit of step function in multi channel
-        ## first n_channels are id's  of connected nodes and the seconds are corresponidg  capacities
-        ## add self.capacities to the fields of env class
+         # defining action space & edit of step function in multi channel
+        # first n_channels are id's  of connected nodes and the seconds are corresponidg  capacities
+        # add self.capacities to the fields of env class'''
 
         #NOTE: the following line is the total budget for the model to utilize in CHANNEL_OPENNING mode
         self.maximum_capacity = max_capacity
@@ -133,6 +133,7 @@ class FeeEnv(gym.Env):
                                    transaction_types=transaction_types,
                                    node_variables=data['node_variables'],
                                    active_providers=data['active_providers'],
+                                   fee_policy = data["fee_policy"],
                                    fixed_transactions=False)
 
         self.seed(seed)
@@ -172,8 +173,6 @@ class FeeEnv(gym.Env):
         # Execute one time step within the environment
         # The second part of the action is action[midpoint:]
             
-        #TODO: #11 set reasonable fees
-        fees = self.get_channel_fees
         action = self.action_fix_index_to_capacity(self.capacities,action)
         midpoint = len(action) // 2
         # updating trgs in simulator
@@ -183,18 +182,26 @@ class FeeEnv(gym.Env):
         In the following couple of lines, new channels are being added to the network, along with active_
         _channels dict and also, channels not present anymore, will be deleted
         '''
-        additive_budget = self.simulator.update_network_and_active_channels(action, self.prev_action)
+        
+        additive_budget, additive_channels, ommitive_channels = self.simulator.update_network_and_active_channels(action, self.prev_action)
         self.prev_action = action
         
-        self.maximum_capacity += additive_budget
+        #TODO: #11 set reasonable fees
+        fees = self.simulator.get_channel_fees(additive_channels)
         
+        
+        self.maximum_capacity += additive_budget
+        self.simulator.update_amount_graph(additive_channels, ommitive_channels,fees)
         # sum_second_part = np.sum(action[midpoint:]) 
         if self.maximum_capacity<0:
             reward = -np.inf
         
         else:
-            balances, transaction_amounts, transaction_numbers = self.simulate_transactions(action, fees)
-            
+            if self.mode == "channel_openning":
+                balances, transaction_amounts, transaction_numbers = self.simulate_transactions(fees)
+            else:
+                balances, transaction_amounts, transaction_numbers = self.simulate_transactions(action)
+
             # Running simulator for a certain time interval
             reward = 1e-6 * np.sum(np.multiply(fees[0:self.n_channel], transaction_amounts) + \
                             np.multiply(fees[self.n_channel:2 * self.n_channel], transaction_numbers))
@@ -212,23 +219,20 @@ class FeeEnv(gym.Env):
 
         return self.state, reward, done, info
 
-    def simulate_transactions(self, action, fees):
-        self.simulator.set_channels_fees(self.mode,fees)
+    def simulate_transactions(self, action, fees, additive_channels, ommitive_channels):
+        self.simulator.set_channels_fees(self.mode,fees,additive_channels[:len(additive_channels)//2])
 
-        output_transactions_dict = self.simulator.run_simulation(action)
+        output_transactions_dict = self.simulator.run_simulation(action, additive_channels, ommitive_channels)
         balances, transaction_amounts, transaction_numbers = self.simulator.get_simulation_results(action,
                                                                                                    output_transactions_dict)
 
         return balances, transaction_amounts, transaction_numbers
     
-    def get_channel_fees(self, action):
-        #TODO #16: set fees as best approach
-        return [1] * 2 * self.n_channel
 
     def reset(self):
         print('episode ended!')
         self.time_step = 0
-        self.state = np.append(self.initial_balances, np.zeros(shape=(self.n_channel,)))
+        self.state = np.append(np.zeros((self.n_nodes,)),self.initial_balances, np.zeros(shape=(self.n_channel,)))
 
         return np.array(self.state, dtype=np.float64)
     

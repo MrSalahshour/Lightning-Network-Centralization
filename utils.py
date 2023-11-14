@@ -92,7 +92,8 @@ def load_data(mode, node, directed_edges_path, providers_path, local_size, manua
     data['node_variables'], \
     data['active_providers'], \
     data['initial_balances'], \
-    data['capacities'] = preprocessing.get_init_parameters(data['providers'],
+    data['capacities'], \
+    data['fee_policy']= preprocessing.get_init_parameters(data['providers'],
                                                            directed_edges,
                                                            data['src'], data['trgs'],
                                                            data['channel_ids'],
