@@ -138,18 +138,23 @@ class simulator():
     In this function, channels of new action will be omited from the network iff they are old channels
     with new assigned capacities or 0 capacity.
     '''
+    
+    midpoint_prev_action = len(prev_action) // 2
+    if midpoint_prev_action == 0:
+      return 0, action, []
+    
     budget = 0
-    midpoint = len(action) // 2
+    midpoint_action = len(action) // 2
     additive_idx = []
     additive_bal = []
     omitting_channels = []
     # trg, bals in action which are new
-    for trg, bal in zip(action[:midpoint], action[midpoint:]):
-      if (trg,bal) not in zip((prev_action[:midpoint], prev_action[midpoint:])):
+    for trg, bal in zip(action[:midpoint_action], action[midpoint_action:]):
+      if (trg,bal) not in zip((prev_action[:midpoint_prev_action], prev_action[midpoint_prev_action:])):
         additive_idx.append(trg)
         additive_bal.append(bal)
         
-        if trg in prev_action[:midpoint]:
+        if trg in prev_action[:midpoint_prev_action]:
           budget += self.network_dictionary[(self.src, trg)][0]
           omitting_channels.append([trg])
           del self.network_dictionary[(self.src, trg)]
@@ -159,8 +164,8 @@ class simulator():
           del self.active_channels[(trg, self.src)]
           
     # trgs in prev_action and not in action anymore      
-    for trg in prev_action[:midpoint]:
-      if trg not in action[:midpoint]:
+    for trg in prev_action[:midpoint_prev_action]:
+      if trg not in action[:midpoint_action]:
           budget += self.network_dictionary[(self.src, trg)][0]
           omitting_channels.append([trg])
           del self.network_dictionary[(self.src, trg)]
@@ -178,7 +183,7 @@ class simulator():
     In this function, channels of new action will be added to the network iff they are new channels
     or have new capacities assigned.
     '''
-    if ~additive_channels:
+    if additive_channels == []:
       return 0
     
     midpoint = len(additive_channels) // 2
@@ -346,7 +351,7 @@ class simulator():
    
 
 
-  def run_simulation_for_each_transaction_type(self, count, amount, epsilon, action,mode):  
+  def run_simulation_for_each_transaction_type(self, count, amount, epsilon, action):  
     
       graph = self.preprocess_amount_graph(amount, action)
 

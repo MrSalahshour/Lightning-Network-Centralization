@@ -36,6 +36,7 @@ def main():
     parser.add_argument('--initial_balances', default=[], type=lambda s: [int(item) for item in s.split(',')])
     parser.add_argument('--capacities', default=[],type=lambda s: [int(item) for item in s.split(',')])
     parser.add_argument('--device', default='auto')
+    parser.add_argument('--max_capacity', type = int, default=5e6) #TODO: add this arg to all scripts
 
     
     args = parser.parse_args()
@@ -55,7 +56,8 @@ def main():
                   'epsilons': args.epsilons,
                   'manual_balance': args.manual_balance,
                   'initial_balances': args.initial_balances,
-                  'capacities': args.capacities}
+                  'capacities': args.capacities,
+                  'max_capacity': args.max_capacity}
 
     for seed in range(args.n_seed):
         train(env_params, train_params,

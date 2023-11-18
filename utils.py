@@ -42,7 +42,7 @@ def make_agent(env, algo, device, tb_log_dir):
 def make_env(data, env_params, seed):
     assert len(env_params['counts']) == len(env_params['amounts']) and len(env_params['counts']) == len(
         env_params['epsilons']), "number of transaction types missmatch"
-    env = FeeEnv(data, env_params['fee_base_upper_bound'], env_params['max_episode_length'],
+    env = FeeEnv(data,env_params['max_capacity'], env_params['fee_base_upper_bound'], env_params['max_episode_length'],
                  len(env_params['counts']),
                  env_params['counts'], env_params['amounts'], env_params['epsilons'],
                  seed)
@@ -73,11 +73,12 @@ def load_data(mode, node, directed_edges_path, providers_path, local_size, manua
     # src_index = node
     
     #TODO #6:
-    src = generate_hex_string(64)
+    src = generate_hex_string(66)
     
     subgraph_radius = 2
     data['providers'] = preprocessing.get_providers(providers_path)
     directed_edges = preprocessing.get_directed_edges(directed_edges_path)
+    
     # for fee selection mode
     # data['src'], data['trgs'], data['channel_ids'], n_channels = preprocessing.select_node(directed_edges, src_index)
     # data['capacities'] = [153243, 8500000, 4101029, 5900000, 2500000, 7000000]
@@ -93,17 +94,18 @@ def load_data(mode, node, directed_edges_path, providers_path, local_size, manua
     data['active_providers'], \
     data['initial_balances'], \
     data['capacities'], \
-    data['fee_policy']= preprocessing.get_init_parameters(data['providers'],
+    data['fee_policy'],\
+    data['nodes']= preprocessing.get_init_parameters(data['providers'],
                                                            directed_edges,
                                                            data['src'], data['trgs'],
                                                            data['channel_ids'],
                                                            channels,
                                                            local_size,
-                                                           manual_balance, initial_balances, capacities)
+                                                           manual_balance, initial_balances, capacities,mode)
     return data
 
 
-
+#NOTE : you can use this method for fee setting in static way too.
 def get_static_fee(directed_edges, node_index, number_of_channels):
     # action = get_original_fee(directed_edges, node_index)
     # action = get_mean_fee(directed_edges, number_of_channels)

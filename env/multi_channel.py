@@ -57,15 +57,15 @@ class FeeEnv(gym.Env):
     def __init__(self, data, max_capacity, fee_base_upper_bound, max_episode_length, number_of_transaction_types, counts, amounts, epsilons, seed):
         # Source node
         self.src = data['src'] 
-        
+        self.prev_action = []
         
         #NOTE: added attribute
-        self.n_nodes = len(data['trgs'].unique())
+        self.n_nodes = len(data['nodes'].unique())
         
         
         self.trgs = data['trgs']
         self.n_channel = len(self.trgs)
-        print('actione dim:', 2 * self.n_channel)
+        print('action dim:', 2 * self.n_channel)
 
         #TODO: #18 remember that following lines are to be used in if structure after the structure of mode is being implemented
         #NOTE: following lines are for fee selection mode
@@ -174,6 +174,7 @@ class FeeEnv(gym.Env):
         # The second part of the action is action[midpoint:]
             
         action = self.action_fix_index_to_capacity(self.capacities,action)
+        action = self.aggregate_action(action)
         midpoint = len(action) // 2
         # updating trgs in simulator
         self.simulator.trgs = action[:midpoint]
@@ -184,21 +185,23 @@ class FeeEnv(gym.Env):
         '''
         
         additive_budget, additive_channels, ommitive_channels = self.simulator.update_network_and_active_channels(action, self.prev_action)
-        self.prev_action = action
-        
-        #TODO: #11 set reasonable fees
-        fees = self.simulator.get_channel_fees(additive_channels)
-        
-        
-        self.maximum_capacity += additive_budget
-        self.simulator.update_amount_graph(additive_channels, ommitive_channels,fees)
-        # sum_second_part = np.sum(action[midpoint:]) 
-        if self.maximum_capacity<0:
+        if self.maximum_capacity+additive_budget<0:
             reward = -np.inf
+            action = self.prev_action
         
         else:
             if self.mode == "channel_openning":
-                balances, transaction_amounts, transaction_numbers = self.simulate_transactions(fees)
+                self.prev_action = action
+        
+                #TODO: #11 set reasonable fees
+                fees = self.simulator.get_channel_fees(additive_channels)
+                
+                
+                self.maximum_capacity += additive_budget
+                self.simulator.update_amount_graph(additive_channels, ommitive_channels,fees)
+                # sum_second_part = np.sum(action[midpoint:]) 
+                
+                balances, transaction_amounts, transaction_numbers = self.simulate_transactions(fees,additive_channels,ommitive_channels)
             else:
                 balances, transaction_amounts, transaction_numbers = self.simulate_transactions(action)
 
@@ -219,8 +222,9 @@ class FeeEnv(gym.Env):
 
         return self.state, reward, done, info
 
-    def simulate_transactions(self, action, fees, additive_channels, ommitive_channels):
-        self.simulator.set_channels_fees(self.mode,fees,additive_channels[:len(additive_channels)//2])
+    def simulate_transactions(self, action, additive_channels = None, ommitive_channels = None):
+        
+        self.simulator.set_channels_fees(self.mode,action,additive_channels[:len(additive_channels)//2])
 
         output_transactions_dict = self.simulator.run_simulation(action, additive_channels, ommitive_channels)
         balances, transaction_amounts, transaction_numbers = self.simulator.get_simulation_results(action,
@@ -236,9 +240,21 @@ class FeeEnv(gym.Env):
 
         return np.array(self.state, dtype=np.float64)
     
-    def action_fix_index_to_capacity(capacities,action):
+    def action_fix_index_to_capacity(self,capacities,action):
         midpoint = len(action) // 2
         for i in action[midpoint:]:
             action[i] = capacities[i]
         return action
+    def aggregate_action(self,action):
+        midpoint = len(action) // 2
+        unique_nodes = list(set(action[:midpoint]))
+        action_bal = []
+        
+        for node in unique_nodes:
+            agg_bal = 0
+            for i in range(midpoint):
+                if action[i] == node:
+                    agg_bal += action[i+midpoint]
+            action_bal.append(agg_bal)
+        return unique_nodes+action_bal
 

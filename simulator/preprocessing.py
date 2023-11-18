@@ -115,12 +115,19 @@ def create_sub_network(directed_edges, providers, src, trgs, channel_ids, local_
     G = nx.from_pandas_edgelist(edges, source="src", target="trg",
                                 edge_attr=['channel_id', 'capacity', 'fee_base_msat', 'fee_rate_milli_msat', 'balance'],
                                 create_using=nx.DiGraph())
-    sub_nodes = get_neighbors(G, src, local_size)
+    if len(trgs)==0:
+        G.add_node(src)
+        sub_nodes = get_neighbors(G, get_random_provider(providers), local_size)
+        sub_nodes.append(src)
+    else:
+        sub_nodes = get_neighbors(G, src, local_size)
+        
     sub_providers = list(set(sub_nodes) & set(providers))
     sub_graph = G.subgraph(sub_nodes)
     sub_edges = nx.to_pandas_edgelist(sub_graph)
-    sub_edges = sub_edges.rename(columns={'source': 'src', 'target': 'trg'})
+    sub_edges = sub_edges.rename(columns={'source': 'src', 'target': 'trg'})    
     network_dictionary = create_network_dictionary(sub_edges)
+
     # network_dictionary = {(src,trg):[balance,alpha,beta,capacity]}
 
     return network_dictionary, sub_nodes, sub_providers, sub_edges
@@ -165,14 +172,14 @@ def select_node(directed_edges, src_index):
 
 #NOTE: creates the node for channel openning mode
 def create_node(directed_edges, src, number_of_channels):
-    trgs = number_of_channels*[None]
+    trgs = []#number_of_channels*[None]
     max_id = max(directed_edges['channel_id'])
     channel_ids = [(max_id + i + 1) for i in range (number_of_channels*2)]
     return src, list(trgs), list(channel_ids), number_of_channels
     
 
 
-def get_init_parameters(providers, directed_edges, src, trgs, channel_ids, channels, local_size, manual_balance, initial_balances, capacities):
+def get_init_parameters(providers, directed_edges, src, trgs, channel_ids, channels, local_size, manual_balance, initial_balances):
     #get fee_base and fee_rate median for each node
     fee_policy_dict = dict()
     for node in directed_edges["src"].unique().tolist():
@@ -197,10 +204,15 @@ def get_init_parameters(providers, directed_edges, src, trgs, channel_ids, chann
         balances.append(b)
         capacities.append(c)
 
-    return active_channels, network_dictionary, node_variables, active_providers, balances, capacities, fee_policy_dict
+    return active_channels, network_dictionary, node_variables, active_providers, balances, capacities, fee_policy_dict, nodes
 
 def generate_transaction_types(number_of_transaction_types, counts, amounts, epsilons):
     transaction_types = []
     for i in range(number_of_transaction_types):
         transaction_types.append((counts[i], amounts[i], epsilons[i]))
     return transaction_types
+def get_random_provider(providers):
+    random.seed(42)
+    return random.choice(providers)
+    
+    
