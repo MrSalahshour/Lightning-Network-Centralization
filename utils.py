@@ -60,9 +60,11 @@ def load_data(mode, node, directed_edges_path, providers_path, local_size, manua
                 initial_balances: initial distribution of capacity of each channel  (default: list)
                 capacities: capacity of each channel  (default: list)
                 node_variables: ???  (default: )
+                                nodes of the localized subgraph
                 providers: Merchants of the whole network  (default: ?)
                 active_providers: Merchants of the local network around src  (default: ?)
                 active_channels: channel which their balances are being updated each timestep  (default: ?)
+                                In other words channels connected to our node
                 network_dictionary: whole network data  (default: dict)
                 n_channels: number of channels within data (default:int)
             }
@@ -95,7 +97,7 @@ def load_data(mode, node, directed_edges_path, providers_path, local_size, manua
     data['initial_balances'], \
     data['capacities'], \
     data['fee_policy'],\
-    data['nodes']= preprocessing.get_init_parameters(data['providers'],
+    data['nodes']= preprocessing.get_init_parameters(mode,data['providers'],
                                                            directed_edges,
                                                            data['src'], data['trgs'],
                                                            data['channel_ids'],

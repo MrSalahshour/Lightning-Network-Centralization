@@ -10,6 +10,7 @@ from . import generating_transactions
 #environment has an object of simulator
 class simulator():
   def __init__(self,
+               mode,
                src,trgs,channel_ids,
                active_channels, network_dictionary,
                merchants,
@@ -20,6 +21,7 @@ class simulator():
                fixed_transactions = True,
                support_onchain_rebalancing = False):
     
+    self.mode = mode
     self.src = src
     self.trgs = trgs
     self.channel_id = channel_ids
@@ -94,7 +96,7 @@ class simulator():
     return graph_dicts
 
 
-
+  #NOTE: why are just active channels updated in the amount graphs
   def update_graphs(self, src, trg):
       for (count,amount,epsilon) in self.transaction_types:
           graph = self.graphs_dict[amount]  
@@ -252,34 +254,35 @@ class simulator():
   #TODO: #15 remember to utilize best approach for peer-fee setting
   def set_channels_fees(self, mode, fees, trgs) : # fees = [alpha1, alpha2, ..., alphan, beta1, beta2, ..., betan] ~ action
     n = len(self.trgs)
-    alphas = fees[0:n]
-    betas = fees[n:]
-    src = self.src
-    for i,trg in enumerate(self.trgs):
-        self.network_dictionary[(src,trg)][1] = alphas[i]
-        self.network_dictionary[(src,trg)][2] = betas[i]
-        if self.is_active_channel(src,trg) :
-          self.active_channels[(src,trg)][1] = alphas[i]
-          self.active_channels[(src,trg)][2] = betas[i]
 
     if mode == 'channel_openning':
-        n = len(trgs)
-        alphas = fees[:2*n]
-        betas = fees[2*n:]
-        src = self.src
-        for i,trg in enumerate(trgs):
-            self.network_dictionary[(src,trg)][1] = alphas[2*i]
-            self.network_dictionary[(src,trg)][2] = betas[2*i]
-            
-            self.network_dictionary[(trg,src)][1] = alphas[2*i+1]
-            self.network_dictionary[(trg,src)][2] = betas[2*i+1]
-            
-            if self.is_active_channel(src,trg) :
-              self.active_channels[(src,trg)][1] = alphas[2*i]
-              self.active_channels[(src,trg)][2] = betas[2*i]
+          alphas = fees[:2*n]
+          betas = fees[2*n:]
+          src = self.src
+          for i,trg in enumerate(trgs):
+              self.network_dictionary[(src,trg)][1] = alphas[2*i]
+              self.network_dictionary[(src,trg)][2] = betas[2*i]
               
-              self.active_channels[(trg,src)][1] = alphas[2*i+1]
-              self.active_channels[(trg,src)][2] = betas[2*i+1]
+              self.network_dictionary[(trg,src)][1] = alphas[2*i+1]
+              self.network_dictionary[(trg,src)][2] = betas[2*i+1]
+              
+              if self.is_active_channel(src,trg) :
+                self.active_channels[(src,trg)][1] = alphas[2*i]
+                self.active_channels[(src,trg)][2] = betas[2*i]
+                
+                self.active_channels[(trg,src)][1] = alphas[2*i+1]
+                self.active_channels[(trg,src)][2] = betas[2*i+1]
+      
+    else:
+      alphas = fees[0:n]
+      betas = fees[n:]
+      src = self.src
+      for i,trg in enumerate(self.trgs):
+          self.network_dictionary[(src,trg)][1] = alphas[i]
+          self.network_dictionary[(src,trg)][2] = betas[i]
+          if self.is_active_channel(src,trg) :
+            self.active_channels[(src,trg)][1] = alphas[i]
+            self.active_channels[(src,trg)][2] = betas[i]
 
 
   def run_single_transaction(self,
@@ -314,13 +317,13 @@ class simulator():
       
     
     midpoint = len(fees) // 2
-    base_fees = fees[:midpoint]
-    fee_rates = fees[midpoint:]
+    fee_rates = fees[:midpoint]
+    base_fees = fees[midpoint:]
     #adding channels with weight to relevant amount graphs
     for i in range(len(additive_ind)):
       trg, bal = additive_ind[i], additive_bal[i]
       for amount, graph in self.graphs_dict:
-        if amount <= bal:
+        if bal >= amount:
           graph.add_edge(trg,self.src,weight = base_fees[2*i]*amount + fee_rates[2*i])
           graph.add_edge(self.src,trg,weight = base_fees[2*i + 1]*amount + fee_rates[2*i + 1])
           
@@ -330,6 +333,9 @@ class simulator():
     
 
   def preprocess_amount_graph(self,amount,action):
+      if self.mode == 'channel_openning':
+        return self.graphs_dict[amount]
+      
       graph = self.graphs_dict[amount]
       src = self.src
       number_of_channels = len(self.trgs)
@@ -617,7 +623,7 @@ class simulator():
       bases.extend([base, base])
       rates.extend([rate, rate])
       
-    return bases + rates
+    return rates + bases
   
     
 

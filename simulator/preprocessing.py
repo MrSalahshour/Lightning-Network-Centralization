@@ -116,6 +116,7 @@ def create_sub_network(directed_edges, providers, src, trgs, channel_ids, local_
                                 edge_attr=['channel_id', 'capacity', 'fee_base_msat', 'fee_rate_milli_msat', 'balance'],
                                 create_using=nx.DiGraph())
     if len(trgs)==0:
+        #NOTE: in CHANNEL OPENNING case, instead of src, a provider is given for generating the local subgraph
         G.add_node(src)
         sub_nodes = get_neighbors(G, get_random_provider(providers), local_size)
         sub_nodes.append(src)
