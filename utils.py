@@ -8,8 +8,7 @@ from env.multi_channel import FeeEnv
 
 def make_agent(env, algo, device, tb_log_dir):
     #NOTE: You must use `MultiInputPolicy` when working with dict observation space, not MlpPolicy
-    # policy = "MlpPolicy"
-    policy = "MultiInputPolicy"
+    policy = "MlpPolicy"
     # create model
     if algo == "PPO":
         from stable_baselines3 import PPO

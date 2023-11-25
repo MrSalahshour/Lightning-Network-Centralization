@@ -40,8 +40,6 @@ def get_neighbors(G, src, local_size):
                   neighbors.append(v)
 
 
-       
-
 def initiate_balances(directed_edges, approach='half'):
     '''
     approach = 'random'
@@ -114,8 +112,9 @@ def create_sub_network(directed_edges, providers, src, trgs, channel_ids, local_
         edges = set_channels_balances(edges, src, trgs, channel_ids, capacities, initial_balances)
     G = nx.from_pandas_edgelist(edges, source="src", target="trg",
                                 edge_attr=['channel_id', 'capacity', 'fee_base_msat', 'fee_rate_milli_msat', 'balance'],
-                                create_using=nx.DiGraph())
+                               create_using=nx.DiGraph())
     if len(trgs)==0:
+        print("No trgs found")
         #NOTE: in CHANNEL OPENNING case, instead of src, a provider is given for generating the local subgraph
         G.add_node(src)
         sub_nodes = get_neighbors(G, get_random_provider(providers), local_size)
