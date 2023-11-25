@@ -1,6 +1,6 @@
 import gym
 from gym import spaces
-from gym import *
+from gym.spaces import *
 from gym.utils import seeding
 import numpy as np
 
@@ -60,7 +60,7 @@ class FeeEnv(gym.Env):
         self.prev_action = []
         
         #NOTE: added attribute
-        self.n_nodes = len(data['nodes'].unique())
+        self.n_nodes = len(data['nodes']) - 1 # nodes should be mines one to doesnt't include our node
         
         self.mode = mode
         self.trgs = data['trgs']
@@ -102,7 +102,7 @@ class FeeEnv(gym.Env):
         node_bounds = [2] * (self.n_nodes) # values can be 0 or 1
         # Create the observation space
         multi_discrete_space = MultiDiscrete(node_bounds)
-        box_space = Box(low=0, high=np.inf, shape=(2 * self.n_channel,), dtype=np.float32)
+        box_space = Box(low=0, high=np.inf, shape=(2 * self.n_nodes,), dtype=np.float32)
         self.observation_space = Dict({
             'multi_discrete': multi_discrete_space,
             'box': box_space
@@ -114,7 +114,10 @@ class FeeEnv(gym.Env):
         # self.state = np.append(self.initial_balances, np.zeros(shape=(self.n_channel,)))
         
         #
-        self.state = np.append(np.zeros(shape=(self.n_nodes,)),np.zeros(shape=(self.n_channel,)), np.zeros(shape=(self.n_channel,)))
+        self.state = dict({
+            'multi_discrete': np.zeros((self.n_nodes,),dtype=np.float32),
+            'box': np.concatenate((np.zeros((self.n_nodes,)),np.zeros((self.n_nodes,))),dtype = np.float32)
+            })
             
         self.time_step = 0
         self.max_episode_length = max_episode_length
@@ -171,6 +174,7 @@ class FeeEnv(gym.Env):
     
     
     def step(self, action):
+        print("step called")
         # Execute one time step within the environment
         # The second part of the action is action[midpoint:]
             
@@ -179,6 +183,7 @@ class FeeEnv(gym.Env):
         midpoint = len(action) // 2
         # updating trgs in simulator
         self.simulator.trgs = action[:midpoint]
+        print(action)
         self.n_channel = midpoint
         
         '''
@@ -223,16 +228,22 @@ class FeeEnv(gym.Env):
         done = self.time_step >= self.max_episode_length
         
         connected_nodes = np.zeros((self.n_nodes,))
-        balances_list = np.zeros((self.n_noders,))
+        balances_list = np.zeros((self.n_nodes,))
         transaction_amounts_list = np.zeros((self.n_nodes,))
         for idx in len(action[:midpoint]):
             connected_nodes[action[idx]] = 1
             balances_list[action[idx]] = balances[idx]
             transaction_amounts_list[action[idx]] = transaction_amounts[idx]
             
-        
-        
-        self.state = np.append(connected_nodes,balances/1000, transaction_amounts/1000)
+        if self.mode == "fee_setting":
+            self.state = np.append(balances, transaction_amounts)/1000
+        else:
+            self.state = dict({
+            'multi_discrete': connected_nodes.astype(np.float32),
+            'box': np.concatenate((balances_list/1000,transaction_amounts_list/1000),dtype = np.float32)
+            })
+            self.state = np.concatenate((connected_nodes,balances_list/1000, transaction_amounts_list/1000))
+            print(self.state)
 
         return self.state, reward, done, info
 
@@ -251,11 +262,18 @@ class FeeEnv(gym.Env):
         print('episode ended!')
         self.time_step = 0
         if self.mode == 'fee_setting':
-            self.state = np.append(np.zeros((self.n_nodes,)),self.initial_balances, np.zeros(shape=(self.n_channel,)))
+            self.state = np.append(self.initial_balances, np.zeros(shape=(self.n_channel,)))
+            return np.array(self.state, dtype=np.float64)
+        
         else:
-            self.state = np.append(np.zeros((self.n_nodes,)),np.zeros((self.n_nodes,)),np.zeros((self.n_nodes,)))
+            self.state = dict({
+            'multi_discrete': np.zeros((self.n_nodes,),dtype=np.float32),
+            'box': np.concatenate((np.zeros((self.n_nodes,)),np.zeros((self.n_nodes,))),dtype = np.float32)
+            })
+            print(self.state)
+            return self.state
             
-        return np.array(self.state, dtype=np.float64)
+        
     
     def action_fix_index_to_capacity(self,capacities,action):
         midpoint = len(action) // 2

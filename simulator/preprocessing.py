@@ -119,7 +119,7 @@ def create_sub_network(directed_edges, providers, src, trgs, channel_ids, local_
         #NOTE: in CHANNEL OPENNING case, instead of src, a provider is given for generating the local subgraph
         G.add_node(src)
         sub_nodes = get_neighbors(G, get_random_provider(providers), local_size)
-        sub_nodes.append(src)
+        sub_nodes.add(src)
     else:
         sub_nodes = get_neighbors(G, src, local_size)
         
@@ -180,18 +180,21 @@ def create_node(directed_edges, src, number_of_channels):
     
 
 
-def get_init_parameters(providers, directed_edges, src, trgs, channel_ids, channels, local_size, manual_balance, initial_balances):
+def get_init_parameters(providers, directed_edges, src, trgs, channel_ids, channels, local_size, manual_balance, initial_balances,capacities,mode):
     #get fee_base and fee_rate median for each node
     fee_policy_dict = dict()
-    for node in directed_edges["src"].unique().tolist():
-        sub_data = directed_edges[directed_edges["src"] == node]
-        fee_rate = sub_data["fee_rate_milli_msat"].median()
-        fee_base = sub_data["fee_base_msat"].median()
-        fee_policy_dict[node] = (fee_base, fee_rate)
+    grouped = directed_edges.groupby(["src"])
+    temp = grouped.agg({
+        "fee_base_msat": "median",
+        "fee_rate_milli_msat": "median",
+    }).reset_index()[["src","fee_base_msat","fee_rate_milli_msat"]]
+    for i in range(len(temp)):
+        fee_policy_dict[temp["src"][i]] = (temp["fee_base_msat"][i], temp["fee_rate_milli_msat"][i])
     
     network_dictionary, nodes, sub_providers, sub_edges = create_sub_network(directed_edges, providers, src, trgs,
                                                                              channel_ids, local_size, manual_balance, initial_balances, capacities)
     active_channels = create_active_channels(network_dictionary, channels)
+
     try:
         node_variables, active_providers, active_ratio = init_node_params(sub_edges, sub_providers, verbose=True)
     except:
@@ -204,7 +207,6 @@ def get_init_parameters(providers, directed_edges, src, trgs, channel_ids, chann
         c = network_dictionary[(src, trg)][3]
         balances.append(b)
         capacities.append(c)
-
     return active_channels, network_dictionary, node_variables, active_providers, balances, capacities, fee_policy_dict, nodes
 
 def generate_transaction_types(number_of_transaction_types, counts, amounts, epsilons):
