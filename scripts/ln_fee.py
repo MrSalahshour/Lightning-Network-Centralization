@@ -6,7 +6,7 @@ import numpy as np
 
 
 def train(env_params, train_params, tb_log_dir, tb_name, log_dir, seed):
-    data = load_data(env_params['node_index'], env_params['data_path'], env_params['merchants_path'], env_params['local_size'],
+    data = load_data(env_params['mode'],env_params['node_index'], env_params['data_path'], env_params['merchants_path'], env_params['local_size'],
                      env_params['manual_balance'], env_params['initial_balances'], env_params['capacities'])
     env = make_env(data, env_params, seed)
     model = make_agent(env, train_params['algo'], train_params['device'], tb_log_dir)
@@ -36,6 +36,8 @@ def main():
     parser.add_argument('--initial_balances', default=[], type=lambda s: [int(item) for item in s.split(',')])
     parser.add_argument('--capacities', default=[],type=lambda s: [int(item) for item in s.split(',')])
     parser.add_argument('--device', default='auto')
+    parser.add_argument('--max_capacity', type = int, default=5e6) 
+    parser.add_argument('--mode', type=str, default='channel_openning')#TODO: add this arg to all scripts
 
     
     args = parser.parse_args()
@@ -44,7 +46,8 @@ def main():
                     'total_timesteps': args.total_timesteps,
                     'device': args. device}
 
-    env_params = {'data_path': args.data_path,
+    env_params = {'mode' : args.mode,
+                  'data_path': args.data_path,
                   'merchants_path': args.merchants_path,
                   'node_index': args.node_index,
                   'fee_base_upper_bound': args.fee_base_upper_bound,
@@ -55,7 +58,8 @@ def main():
                   'epsilons': args.epsilons,
                   'manual_balance': args.manual_balance,
                   'initial_balances': args.initial_balances,
-                  'capacities': args.capacities}
+                  'capacities': args.capacities,
+                  'max_capacity': args.max_capacity}
 
     for seed in range(args.n_seed):
         train(env_params, train_params,

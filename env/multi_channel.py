@@ -7,7 +7,7 @@ import numpy as np
 from simulator.simulator import simulator
 from simulator.preprocessing import generate_transaction_types
 
-
+#TODO: #12 self.mode
 class FeeEnv(gym.Env):
     """
     ### Description
@@ -54,32 +54,35 @@ class FeeEnv(gym.Env):
     We are adding the income from each payment to balance of the corresponding channel.
     """
 
-    def __init__(self, data, fee_base_upper_bound, max_episode_length, number_of_transaction_types, counts, amounts, epsilons, seed):
+    def __init__(self, mode, data, max_capacity, fee_base_upper_bound, max_episode_length, number_of_transaction_types, counts, amounts, epsilons, seed):
         # Source node
         self.src = data['src'] 
-        
+        self.prev_action = []
         
         #NOTE: added attribute
-        self.n_nodes = len(data['trgs'].unique())
+        self.n_nodes = len(data['nodes'].unique())
         
-        
+        self.mode = mode
         self.trgs = data['trgs']
         self.n_channel = len(self.trgs)
-        print('actione dim:', 2 * self.n_channel)
+        print('action dim:', 2 * self.n_channel)
 
+        #TODO: #18 remember that following lines are to be used in if structure after the structure of mode is being implemented
         #NOTE: following lines are for fee selection mode
-        # # Base fee and fee rate for each channel of src
-        # self.action_space = spaces.Box(low=-1, high=+1, shape=(2 * self.n_channel,), dtype=np.float32)
-        # self.fee_rate_upper_bound = 1000
-        # self.fee_base_upper_bound = fee_base_upper_bound
+        '''# Base fee and fee rate for each channel of src
+        self.action_space = spaces.Box(low=-1, high=+1, shape=(2 * self.n_channel,), dtype=np.float32)
+        self.fee_rate_upper_bound = 1000
+        self.fee_base_upper_bound = fee_base_upper_bound
 
-        # # Balance and transaction amount of each channel
-        # self.observation_space = spaces.Box(low=0, high=np.inf, shape=(2 * self.n_channel,), dtype=np.float32)
+        # Balance and transaction amount of each channel
+        self.observation_space = spaces.Box(low=0, high=np.inf, shape=(2 * self.n_channel,), dtype=np.float32)
 
-         ## defining action space & edit of step function in multi channel
-        ## first n_channels are id's  of connected nodes and the seconds are corresponidg  capacities
-        ## add self.capacities to the fields of env class
+         # defining action space & edit of step function in multi channel
+        # first n_channels are id's  of connected nodes and the seconds are corresponidg  capacities
+        # add self.capacities to the fields of env class'''
 
+        #NOTE: the following line is the total budget for the model to utilize in CHANNEL_OPENNING mode
+        self.maximum_capacity = max_capacity
         #TODO #8:
         self.capacities = [50000, 100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000,
                                 1000000, 2000000, 3000000, 4000000, 5000000, 6000000, 7000000, 8000000, 9000000, 10000000] # mSAT
@@ -109,8 +112,10 @@ class FeeEnv(gym.Env):
         # self.initial_balances = data['initial_balances']
         # self.capacities = data['capacities']
         # self.state = np.append(self.initial_balances, np.zeros(shape=(self.n_channel,)))
+        
+        #
         self.state = np.append(np.zeros(shape=(self.n_nodes,)),np.zeros(shape=(self.n_channel,)), np.zeros(shape=(self.n_channel,)))
-
+            
         self.time_step = 0
         self.max_episode_length = max_episode_length
         # for fee selection
@@ -119,7 +124,8 @@ class FeeEnv(gym.Env):
         # Simulator
         transaction_types = generate_transaction_types(number_of_transaction_types, counts, amounts,
                                                        epsilons)
-        self.simulator = simulator(src=data['src'],
+        self.simulator = simulator(mode=self.mode,
+                                   src=data['src'],
                                    trgs=data['trgs'],
                                    channel_ids=data['channel_ids'],
                                    active_channels=data['active_channels'],
@@ -128,6 +134,7 @@ class FeeEnv(gym.Env):
                                    transaction_types=transaction_types,
                                    node_variables=data['node_variables'],
                                    active_providers=data['active_providers'],
+                                   fee_policy = data["fee_policy"],
                                    fixed_transactions=False)
 
         self.seed(seed)
@@ -137,56 +144,134 @@ class FeeEnv(gym.Env):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
+    #NOTE: might need to add fees attr to set_channel_fees in the following
+    # def step(self, action, rescale=True):
+    #     # Rescaling the action vector (fee selection mode)
+    #     # if rescale:
+    #     #     action[0:self.n_channel] = .5 * self.fee_rate_upper_bound * action[0:self.n_channel] + \
+    #     #                                .5 * self.fee_rate_upper_bound
+    #     #     action[self.n_channel:2 * self.n_channel] = .5 * self.fee_base_upper_bound * action[
+    #     #                                                                                  self.n_channel:2 * self.n_channel] + \
+    #     #                                                 .5 * self.fee_base_upper_bound
 
-    def step(self, action, rescale=True):
-        # Rescaling the action vector (fee selection mode)
-        # if rescale:
-        #     action[0:self.n_channel] = .5 * self.fee_rate_upper_bound * action[0:self.n_channel] + \
-        #                                .5 * self.fee_rate_upper_bound
-        #     action[self.n_channel:2 * self.n_channel] = .5 * self.fee_base_upper_bound * action[
-        #                                                                                  self.n_channel:2 * self.n_channel] + \
-        #                                                 .5 * self.fee_base_upper_bound
+    #     # Running simulator for a certain time interval
+    #     balances, transaction_amounts, transaction_numbers = self.simulate_transactions(action)
+    #     self.time_step += 1
 
-        # Running simulator for a certain time interval
-        balances, transaction_amounts, transaction_numbers = self.simulate_transactions(action)
+    #     reward = 1e-6 * np.sum(np.multiply(action[0:self.n_channel], transaction_amounts) + \
+    #                     np.multiply(action[self.n_channel:2 * self.n_channel], transaction_numbers))
+
+    #     info = {'TimeLimit.truncated': True if self.time_step >= self.max_episode_length else False}
+
+    #     done = self.time_step >= self.max_episode_length
+
+    #     self.state = np.append(balances, transaction_amounts)/1000
+
+    #     return self.state, reward, done, info
+    
+    
+    def step(self, action):
+        # Execute one time step within the environment
+        # The second part of the action is action[midpoint:]
+            
+        action = self.action_fix_index_to_capacity(self.capacities,action)
+        action = self.aggregate_action(action)
+        midpoint = len(action) // 2
+        # updating trgs in simulator
+        self.simulator.trgs = action[:midpoint]
+        self.n_channel = midpoint
+        
+        '''
+        In the following couple of lines, new channels are being added to the network, along with active_
+        _channels dict and also, channels not present anymore, will be deleted
+        '''
+        
+        additive_budget, additive_channels, ommitive_channels = self.simulator.update_network_and_active_channels(action, self.prev_action)
+        if self.maximum_capacity+additive_budget<0:
+            reward = -np.inf
+            action = self.prev_action
+        
+        else:
+            reward = 0
+            if self.mode == "channel_openning":
+                self.prev_action = action
+        
+                #TODO: #11 set reasonable fees
+                fees = self.simulator.get_channel_fees(action)
+                
+                #updating the available budget
+                self.maximum_capacity += additive_budget
+                self.simulator.update_amount_graph(additive_channels, ommitive_channels,fees)
+                # sum_second_part = np.sum(action[midpoint:]) 
+                
+                balances, transaction_amounts, transaction_numbers = self.simulate_transactions(fees,additive_channels,ommitive_channels)
+                
+                fees = fees[::2]
+                reward = 1e-6 * np.sum(np.multiply(fees[0:self.n_channel], transaction_amounts) + \
+                            np.multiply(fees[self.n_channel:], transaction_numbers))
+            else:
+                balances, transaction_amounts, transaction_numbers = self.simulate_transactions(action)
+                reward = 1e-6 * np.sum(np.multiply(action[0:self.n_channel], transaction_amounts) + \
+                            np.multiply(action[self.n_channel:2 * self.n_channel], transaction_numbers))
+
+            # Running simulator for a certain time interval
+            
+            
+
         self.time_step += 1
-
-        reward = 1e-6 * np.sum(np.multiply(action[0:self.n_channel], transaction_amounts) + \
-                        np.multiply(action[self.n_channel:2 * self.n_channel], transaction_numbers))
-
         info = {'TimeLimit.truncated': True if self.time_step >= self.max_episode_length else False}
-
         done = self.time_step >= self.max_episode_length
-
-        self.state = np.append(balances, transaction_amounts)/1000
+        
+        connected_nodes = np.zeros((self.n_nodes,))
+        balances_list = np.zeros((self.n_noders,))
+        transaction_amounts_list = np.zeros((self.n_nodes,))
+        for idx in len(action[:midpoint]):
+            connected_nodes[action[idx]] = 1
+            balances_list[action[idx]] = balances[idx]
+            transaction_amounts_list[action[idx]] = transaction_amounts[idx]
+            
+        
+        
+        self.state = np.append(connected_nodes,balances/1000, transaction_amounts/1000)
 
         return self.state, reward, done, info
 
-    def simulate_transactions(self, action):
-        self.simulator.set_channels_fees(action)
+    def simulate_transactions(self, action, additive_channels = None, ommitive_channels = None):
+        #NOTE: fees set in the step, now will be added to network_dict and active_channels
+        self.simulator.set_channels_fees(self.mode,action,additive_channels[:len(additive_channels)//2])
 
-        output_transactions_dict = self.simulator.run_simulation(action)
+        output_transactions_dict = self.simulator.run_simulation(action, additive_channels, ommitive_channels)
         balances, transaction_amounts, transaction_numbers = self.simulator.get_simulation_results(action,
                                                                                                    output_transactions_dict)
 
         return balances, transaction_amounts, transaction_numbers
     
-    #NOTE: first commit:
-    '''
-    def simulate_transactions(self, action):
-    
-        self.simulator.set_channel_fees(action)
-        
-        output_transactions_dict = self.simulator.run_simulation(action, fees)
-        balances, transaction_amounts, transaction_numbers = self.simulator.get_simulation_results(action,
-                                                                                                   output_transactions_dict)
-
-    '''
 
     def reset(self):
         print('episode ended!')
         self.time_step = 0
-        self.state = np.append(self.initial_balances, np.zeros(shape=(self.n_channel,)))
-
+        if self.mode == 'fee_setting':
+            self.state = np.append(np.zeros((self.n_nodes,)),self.initial_balances, np.zeros(shape=(self.n_channel,)))
+        else:
+            self.state = np.append(np.zeros((self.n_nodes,)),np.zeros((self.n_nodes,)),np.zeros((self.n_nodes,)))
+            
         return np.array(self.state, dtype=np.float64)
+    
+    def action_fix_index_to_capacity(self,capacities,action):
+        midpoint = len(action) // 2
+        for i in action[midpoint:]:
+            action[i] = capacities[i]
+        return action
+    def aggregate_action(self,action):
+        midpoint = len(action) // 2
+        unique_nodes = list(set(action[:midpoint]))
+        action_bal = []
+        
+        for node in unique_nodes:
+            agg_bal = 0
+            for i in range(midpoint):
+                if action[i] == node:
+                    agg_bal += action[i+midpoint]
+            action_bal.append(agg_bal)
+        return unique_nodes+action_bal
 

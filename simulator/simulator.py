@@ -10,15 +10,18 @@ from . import generating_transactions
 #environment has an object of simulator
 class simulator():
   def __init__(self,
+               mode,
                src,trgs,channel_ids,
                active_channels, network_dictionary,
                merchants,
                transaction_types, # = [(count, amount, epsilon),...]
                node_variables,
                active_providers,
+               fee_policy,
                fixed_transactions = True,
                support_onchain_rebalancing = False):
     
+    self.mode = mode
     self.src = src
     self.trgs = trgs
     self.channel_id = channel_ids
@@ -28,6 +31,7 @@ class simulator():
     self.node_variables = node_variables
     self.active_providers = active_providers
     self.active_channels = active_channels
+    self.fee_policy = fee_policy
     self.network_dictionary = network_dictionary
     self.fixed_transactions = fixed_transactions
     self.support_onchain_rebalancing = support_onchain_rebalancing
@@ -63,10 +67,15 @@ class simulator():
 
 
   def generate_graph(self, amount):
+    '''Description: for each transaction_type, outputs a subgraph
+                    in which the relevant transactions can flow.
+
+    '''
     self.sync_network_dictionary()
     graph = nx.DiGraph()
     for key in self.network_dictionary :
       val = self.network_dictionary[key]
+      # val[0] represents balance key[0] src and key[1] target, val[1] is fee_base and val[2] is fee_rate
       if val[0] > amount :
           graph.add_edge(key[0],key[1],weight = val[1]*amount + val[2])
     
@@ -75,6 +84,11 @@ class simulator():
 
 
   def generate_graphs_dict(self, transaction_types):
+    '''
+    Description: generates subgraph for each transaction_type.
+    ]            This is done during each iteration.
+                 
+    '''
     graph_dicts = dict()
     for (count, amount, epsilon) in transaction_types :
         graph = self.generate_graph(amount)
@@ -82,7 +96,7 @@ class simulator():
     return graph_dicts
 
 
-
+  #NOTE: why are just active channels updated in the amount graphs
   def update_graphs(self, src, trg):
       for (count,amount,epsilon) in self.transaction_types:
           graph = self.graphs_dict[amount]  
@@ -113,8 +127,82 @@ class simulator():
         self.active_channels[(src,trg)][0] = self.active_channels[(src,trg)][0] - transaction_amount
         self.active_channels[(trg,src)][0] = self.active_channels[(trg,src)][0] + transaction_amount
         
+# Complementary
+  def update_network_and_active_channels(self, action, prev_action):
+    additive_budget, additive_channels, omitting_channels = self.delete_previous_action(self, action, prev_action)
+    additive_budget += self.add_to_network_and_active_channels(self, additive_channels)
+    
+    return additive_budget, additive_channels, omitting_channels
+  
+  # Complementary
+  def delete_previous_action_differences(self, action, prev_action):
+    '''
+    In this function, channels of new action will be omited from the network iff they are old channels
+    with new assigned capacities or 0 capacity.
+    '''
+    
+    midpoint_prev_action = len(prev_action) // 2
+    if midpoint_prev_action == 0:
+      return 0, action, []
+    
+    budget = 0
+    midpoint_action = len(action) // 2
+    additive_idx = []
+    additive_bal = []
+    omitting_channels = []
+    # trg, bals in action which are new
+    for trg, bal in zip(action[:midpoint_action], action[midpoint_action:]):
+      if (trg,bal) not in zip((prev_action[:midpoint_prev_action], prev_action[midpoint_prev_action:])):
+        additive_idx.append(trg)
+        additive_bal.append(bal)
+        
+        if trg in prev_action[:midpoint_prev_action]:
+          budget += self.network_dictionary[(self.src, trg)][0]
+          omitting_channels.append([trg])
+          del self.network_dictionary[(self.src, trg)]
+          del self.network_dictionary[(trg, self.src)]
+          
+          del self.active_channels[(self.src, trg)]
+          del self.active_channels[(trg, self.src)]
+          
+    # trgs in prev_action and not in action anymore      
+    for trg in prev_action[:midpoint_prev_action]:
+      if trg not in action[:midpoint_action]:
+          budget += self.network_dictionary[(self.src, trg)][0]
+          omitting_channels.append([trg])
+          del self.network_dictionary[(self.src, trg)]
+          del self.network_dictionary[(trg, self.src)]
+          
+          del self.active_channels[(self.src, trg)]
+          del self.active_channels[(trg, self.src)]
+        
+    
+    return budget, additive_idx+additive_bal, omitting_channels
+    
+  # Complementary
+  def add_to_network_and_active_channels(self, additive_channels):
+    '''
+    In this function, channels of new action will be added to the network iff they are new channels
+    or have new capacities assigned.
+    '''
+    if additive_channels == []:
+      return 0
+    
+    midpoint = len(additive_channels) // 2
+    cumulative_budget = 0
+    for trg, bal in zip(additive_channels[:midpoint], additive_channels[midpoint:]):
+      self.network_dictionary[(self.src, trg)] = [bal, None, None, 2* bal]
+      self.network_dictionary[(trg, self.src)] = [bal, None, None, 2* bal]
+      
+      self.active_channels[(self.src, trg)] = self.network_dictionary[(self.src, trg)]
+      self.active_channels[(trg, self.src)] = self.network_dictionary[(trg, self.src)]
+      
+      cumulative_budget -= bal
+      
+    return cumulative_budget
 
 
+    
 
   def update_network_data(self, path, transaction_amount):
       for i in range(len(path)-1) :
@@ -131,7 +219,7 @@ class simulator():
     return ((src,trg) in self.active_channels)
         
 
-
+#TODO: #19 take a look at this for first lines of step function
   def onchain_rebalancing(self, onchain_rebalancing_amount, src, trg, channel_id):
     if self.is_active_channel(src,trg) :
       self.active_channels[(src,trg)][0] += onchain_rebalancing_amount  
@@ -163,19 +251,38 @@ class simulator():
         self.active_channels[(src,trg)][1] = alpha
         self.active_channels[(src,trg)][2] = beta
 
-
-  def set_channels_fees(self,fees) : # fees = [alpha1, alpha2, ..., alphan, beta1, beta2, ..., betan] ~ action
+  #TODO: #15 remember to utilize best approach for peer-fee setting
+  def set_channels_fees(self, mode, fees, trgs) : # fees = [alpha1, alpha2, ..., alphan, beta1, beta2, ..., betan] ~ action
     n = len(self.trgs)
-    alphas = fees[0:n]
-    betas = fees[n:]
-    src = self.src
-    for i,trg in enumerate(self.trgs):
-        self.network_dictionary[(src,trg)][1] = alphas[i]
-        self.network_dictionary[(src,trg)][2] = betas[i]
-        if self.is_active_channel(src,trg) :
-          self.active_channels[(src,trg)][1] = alphas[i]
-          self.active_channels[(src,trg)][2] = betas[i]
 
+    if mode == 'channel_openning':
+          alphas = fees[:2*n]
+          betas = fees[2*n:]
+          src = self.src
+          for i,trg in enumerate(trgs):
+              self.network_dictionary[(src,trg)][1] = alphas[2*i]
+              self.network_dictionary[(src,trg)][2] = betas[2*i]
+              
+              self.network_dictionary[(trg,src)][1] = alphas[2*i+1]
+              self.network_dictionary[(trg,src)][2] = betas[2*i+1]
+              
+              if self.is_active_channel(src,trg) :
+                self.active_channels[(src,trg)][1] = alphas[2*i]
+                self.active_channels[(src,trg)][2] = betas[2*i]
+                
+                self.active_channels[(trg,src)][1] = alphas[2*i+1]
+                self.active_channels[(trg,src)][2] = betas[2*i+1]
+      
+    else:
+      alphas = fees[0:n]
+      betas = fees[n:]
+      src = self.src
+      for i,trg in enumerate(self.trgs):
+          self.network_dictionary[(src,trg)][1] = alphas[i]
+          self.network_dictionary[(src,trg)][2] = betas[i]
+          if self.is_active_channel(src,trg) :
+            self.active_channels[(src,trg)][1] = alphas[i]
+            self.active_channels[(src,trg)][2] = betas[i]
 
 
   def run_single_transaction(self,
@@ -195,10 +302,40 @@ class simulator():
     result_bit = 1
     info = {'successful'}
     return path, result_bit, info 
-
-
+  
+  #TODO: #20 edges should be added to and deleted from digraph
+  def update_amount_graph(self,additive_channels,omitting_channels,fees):
+    midpoint = len(additive_channels) // 2
+    additive_ind = additive_channels[:midpoint]
+    additive_bal = additive_channels[midpoint:]
+    
+    #removing omitting channels from amount graphs
+    for key in omitting_channels :
+      for amount, graph in self.graphs_dict:
+        graph.remove(self.src,key)
+        graph.remove(key,self.src)
+      
+    
+    midpoint = len(fees) // 2
+    fee_rates = fees[:midpoint]
+    base_fees = fees[midpoint:]
+    #adding channels with weight to relevant amount graphs
+    for i in range(len(additive_ind)):
+      trg, bal = additive_ind[i], additive_bal[i]
+      for amount, graph in self.graphs_dict:
+        if bal >= amount:
+          graph.add_edge(trg,self.src,weight = base_fees[2*i]*amount + fee_rates[2*i])
+          graph.add_edge(self.src,trg,weight = base_fees[2*i + 1]*amount + fee_rates[2*i + 1])
+          
+  
+        
+      
+    
 
   def preprocess_amount_graph(self,amount,action):
+      if self.mode == 'channel_openning':
+        return self.graphs_dict[amount]
+      
       graph = self.graphs_dict[amount]
       src = self.src
       number_of_channels = len(self.trgs)
@@ -209,24 +346,6 @@ class simulator():
           graph[src][trg]['weight'] = alphas[i]*amount + betas[i]
       self.graphs_dict[amount] = graph
       return graph
-  
-  
-  #NOTE: first commit:
-    '''
-    def preprocess_amount_graph(self,amount,action, fees):
-      graph = self.graphs_dict[amount]
-      src = self.src
-      number_of_channels = len(self.trgs)
-      alphas = fees[0:number_of_channels]
-      betas = fees[number_of_channels:]
-      for i,trg in enumerate(self.trgs) :
-        if graph.has_edge(src, trg):
-          graph[src][trg]['weight'] = alphas[i]*amount + betas[i]
-      self.graphs_dict[amount] = graph
-      return graph                                                                                    output_transactions_dict)
-
-    '''
-
 
 
   def run_simulation(self, action):   # action = [alphas, betas] = [alpha1, ..., alphan, beta1, ..., betan]
@@ -236,19 +355,10 @@ class simulator():
         output_transactions_dict[amount] = trs
     return output_transactions_dict
    
-   
-#NOTE: first commit:
-    '''
-    def run_simulation(self, action, fees):   # action = [alphas, betas] = [alpha1, ..., alphan, beta1, ..., betan]
-    output_transactions_dict = dict()
-    for (count,amount,epsilon) in self.transaction_types:
-        trs = self.run_simulation_for_each_transaction_type(count, amount, epsilon ,action, fees)
-        output_transactions_dict[amount] = trs
-    return output_transactions_dict
-    '''
 
 
   def run_simulation_for_each_transaction_type(self, count, amount, epsilon, action):  
+    
       graph = self.preprocess_amount_graph(amount, action)
 
       #Run Transactions
@@ -500,4 +610,21 @@ class simulator():
           fee, rebalancing_type = 0 , -20 # counter-clockwise failed
 
     return fee, rebalancing_type
+  
+  
+  def get_channel_fees(self, additive_channels):
+    #NOTE: the approach taken is Match-Peer approach, and for the peer, we use median approach
+    bases = []
+    rates = []
+    midpoint = len(additive_channels) // 2
+    for trg in additive_channels[:midpoint]:
+      base,rate = self.fee_policy[additive_channels[trg]]
+      
+      bases.extend([base, base])
+      rates.extend([rate, rate])
+      
+    return rates + bases
+  
+    
+
 

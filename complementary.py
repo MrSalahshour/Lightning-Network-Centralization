@@ -25,7 +25,7 @@ def get_node_with_highest_betweenness_centrality(G):
     highest_betweenness_node = max(betweenness_centralities, key=betweenness_centralities.get)
 
     return highest_betweenness_node
-
+#TODO: #17 add this function to simulator, it will be called in STEP, in order to have the data when something external happens to  the process
 def add_edge_to_digraph(G: nx.DiGraph, source: any, target: any, edge_attrs: dict) -> nx.DiGraph:
     """
     Adds an edge between two nodes in a NetworkX DiGraph with the specified edge attributes.
@@ -132,35 +132,11 @@ def add_to_active_channels(self,src,action):
         self.active_channels[(trg,src)][0] = self.active_channels[(trg,src)][0]
 
 ## def to trnsform capacities indesx(selected in action space) to values of capacities
-def action_fix_index_to_capacity(capacities,action):
-  midpoint = len(action) // 2
-  for i in action[midpoint:]:
-    action[i] = capacities[i]
-  return action
 
 
 
-def step(self, action):
-    # Execute one time step within the environment
-    # The second part of the action is action[midpoint:]
-    action = action_fix_index_to_capacity(self.capacities,action)
-    midpoint = len(action) // 2
-    sum_second_part = np.sum(action[midpoint:])
-    balances, transaction_amounts, transaction_numbers = self.simulate_transactions(action)
-    if sum_second_part > self.maximum_capacity:
-        reward = -np.inf
-    else:
-        # Running simulator for a certain time interval
-        # fees =????
-        reward = 1e-6 * np.sum(np.multiply(fees[0:self.n_channel], transaction_amounts) + \
-                        np.multiply(fees[self.n_channel:2 * self.n_channel], transaction_numbers))
 
-    self.time_step += 1
-    info = {'TimeLimit.truncated': True if self.time_step >= self.max_episode_length else False}
-    done = self.time_step >= self.max_episode_length
-    self.state = np.append(balances, transaction_amounts)/1000
 
-    return self.state, reward, done, info
 
 
 #
