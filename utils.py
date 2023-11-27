@@ -7,6 +7,7 @@ from env.multi_channel import FeeEnv
 
 
 def make_agent(env, algo, device, tb_log_dir):
+    #NOTE: You must use `MultiInputPolicy` when working with dict observation space, not MlpPolicy
     policy = "MlpPolicy"
     # create model
     if algo == "PPO":
@@ -42,7 +43,7 @@ def make_agent(env, algo, device, tb_log_dir):
 def make_env(data, env_params, seed):
     assert len(env_params['counts']) == len(env_params['amounts']) and len(env_params['counts']) == len(
         env_params['epsilons']), "number of transaction types missmatch"
-    env = FeeEnv(data,env_params['max_capacity'], env_params['fee_base_upper_bound'], env_params['max_episode_length'],
+    env = FeeEnv(env_params["mode"],data,env_params['max_capacity'], env_params['fee_base_upper_bound'], env_params['max_episode_length'],
                  len(env_params['counts']),
                  env_params['counts'], env_params['amounts'], env_params['epsilons'],
                  seed)
@@ -79,6 +80,7 @@ def load_data(mode, node, directed_edges_path, providers_path, local_size, manua
     
     subgraph_radius = 2
     data['providers'] = preprocessing.get_providers(providers_path)
+    
     directed_edges = preprocessing.get_directed_edges(directed_edges_path)
     
     # for fee selection mode
@@ -86,7 +88,7 @@ def load_data(mode, node, directed_edges_path, providers_path, local_size, manua
     # data['capacities'] = [153243, 8500000, 4101029, 5900000, 2500000, 7000000]
     # data['initial_balances'] = [153243 / 2, 8500000 / 2, 4101029 / 2, 5900000 / 2, 2500000 / 2, 7000000 / 2]
     
-    data['src'], data['trgs'], data['channel_ids'] = preprocessing.create_node(directed_edges, src, n_channels)
+    data['src'], data['trgs'], data['channel_ids'], _ = preprocessing.create_node(directed_edges, src, n_channels)
     channels = []
     for trg in data['trgs']:
         channels.append((data['src'], trg))
@@ -97,7 +99,7 @@ def load_data(mode, node, directed_edges_path, providers_path, local_size, manua
     data['initial_balances'], \
     data['capacities'], \
     data['fee_policy'],\
-    data['nodes']= preprocessing.get_init_parameters(mode,data['providers'],
+    data['nodes']= preprocessing.get_init_parameters(data['providers'],
                                                            directed_edges,
                                                            data['src'], data['trgs'],
                                                            data['channel_ids'],

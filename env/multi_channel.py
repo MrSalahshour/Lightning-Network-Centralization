@@ -1,6 +1,6 @@
 import gym
 from gym import spaces
-from gym import *
+from gym.spaces import *
 from gym.utils import seeding
 import numpy as np
 
@@ -60,12 +60,13 @@ class FeeEnv(gym.Env):
         self.prev_action = []
         
         #NOTE: added attribute
-        self.n_nodes = len(data['nodes'].unique())
-        
+        self.n_nodes = len(data['nodes']) - 1 # nodes should be mines one to doesnt't include our node
+        print("Nodes: ",self.n_nodes)
         self.mode = mode
         self.trgs = data['trgs']
-        self.n_channel = len(self.trgs)
+        self.n_channel = int(len(data["channel_ids"])/2)
         print('action dim:', 2 * self.n_channel)
+        
 
         #TODO: #18 remember that following lines are to be used in if structure after the structure of mode is being implemented
         #NOTE: following lines are for fee selection mode
@@ -85,28 +86,24 @@ class FeeEnv(gym.Env):
         self.maximum_capacity = max_capacity
         #TODO #8:
         self.capacities = [50000, 100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000,
-                                1000000, 2000000, 3000000, 4000000, 5000000, 6000000, 7000000, 8000000, 9000000, 10000000] # mSAT
+                                1000000, 2000000, 3000000, 4000000, 5000000, 6000000, 7000000, 8000000, 9000000, 10000000] 
 
-        self.action_space = MultiDiscrete([self.n_nodes for _ in range(self.n_channel)] + [len(self.capacities) for _ in range(self.n_channel)])
+
+
+        self.action_space = spaces.MultiDiscrete([self.n_nodes for _ in range(self.n_channel)] + [len(self.capacities) for _ in range(self.n_channel)])
+  
+
 
 
         #NOTE: defining observation space
         # The observation is a ndarray with shape (n_nodes + 2*n_channels,). The first part of the observation space is 2*n_nodes with the values of 0 or 1, indicating whether we connect a channel with it or not.
         #The second part is 2*n_channels with the values corresponding to the balance of each channel and also accumulative transaction amounts in each time step.
         #Please note that the dimensions for balance and transaction amounts start from n_nodes and n_nodes + n_channels respectively. This allows us to separate the node connection information from the channel balance and transaction amounts.
-        
-        maximum_balance = ... # maximum balance
-        max_transaction_amount = ... # maximum transaction amount
 
-        # Define the bounds for each part of the observation space
-        node_bounds = [2] * (self.n_nodes) # values can be 0 or 1
-        # Create the observation space
-        multi_discrete_space = MultiDiscrete(node_bounds)
-        box_space = Box(low=0, high=np.inf, shape=(2 * self.n_channel,), dtype=np.float32)
-        self.observation_space = Dict({
-            'multi_discrete': multi_discrete_space,
-            'box': box_space
-            })
+        self.max_balance = 5e6
+        self.max_transaction_amount = 42e11
+
+        self.observation_space = MultiDiscrete([2] * (self.n_nodes) + [self.max_balance] * (self.n_channel) + [self.max_transaction_amount] * (self.n_channel))
             
         # Initial values of each channel for fee selection mode
         # self.initial_balances = data['initial_balances']
@@ -114,7 +111,7 @@ class FeeEnv(gym.Env):
         # self.state = np.append(self.initial_balances, np.zeros(shape=(self.n_channel,)))
         
         #
-        self.state = np.append(np.zeros(shape=(self.n_nodes,)),np.zeros(shape=(self.n_channel,)), np.zeros(shape=(self.n_channel,)))
+        self.state = np.concatenate((np.zeros(shape=(self.n_nodes,)), np.zeros(shape=(self.n_channel)),np.zeros(shape=(self.n_channel))))
             
         self.time_step = 0
         self.max_episode_length = max_episode_length
@@ -171,6 +168,7 @@ class FeeEnv(gym.Env):
     
     
     def step(self, action):
+        print("step called")
         # Execute one time step within the environment
         # The second part of the action is action[midpoint:]
             
@@ -179,6 +177,7 @@ class FeeEnv(gym.Env):
         midpoint = len(action) // 2
         # updating trgs in simulator
         self.simulator.trgs = action[:midpoint]
+        print(action)
         self.n_channel = midpoint
         
         '''
@@ -223,16 +222,17 @@ class FeeEnv(gym.Env):
         done = self.time_step >= self.max_episode_length
         
         connected_nodes = np.zeros((self.n_nodes,))
-        balances_list = np.zeros((self.n_noders,))
+        balances_list = np.zeros((self.n_nodes,))
         transaction_amounts_list = np.zeros((self.n_nodes,))
         for idx in len(action[:midpoint]):
             connected_nodes[action[idx]] = 1
             balances_list[action[idx]] = balances[idx]
             transaction_amounts_list[action[idx]] = transaction_amounts[idx]
             
-        
-        
-        self.state = np.append(connected_nodes,balances/1000, transaction_amounts/1000)
+        if self.mode == "fee_setting":
+            self.state = np.append(balances, transaction_amounts)/1000
+        else:
+            self.state = np.concatenate((connected_nodes, balances_list,transaction_amounts_list))
 
         return self.state, reward, done, info
 
@@ -251,11 +251,14 @@ class FeeEnv(gym.Env):
         print('episode ended!')
         self.time_step = 0
         if self.mode == 'fee_setting':
-            self.state = np.append(np.zeros((self.n_nodes,)),self.initial_balances, np.zeros(shape=(self.n_channel,)))
+            self.state = np.append(self.initial_balances, np.zeros(shape=(self.n_channel,)))
+            return np.array(self.state, dtype=np.float64)
+        
         else:
-            self.state = np.append(np.zeros((self.n_nodes,)),np.zeros((self.n_nodes,)),np.zeros((self.n_nodes,)))
+            self.state = np.concatenate((np.zeros(shape=(self.n_nodes,)), np.zeros(shape=(self.n_channel)),np.zeros(shape=(self.n_channel))))
+            return self.state
             
-        return np.array(self.state, dtype=np.float64)
+        
     
     def action_fix_index_to_capacity(self,capacities,action):
         midpoint = len(action) // 2
