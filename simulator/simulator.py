@@ -129,8 +129,8 @@ class simulator():
         
 # Complementary
   def update_network_and_active_channels(self, action, prev_action):
-    additive_budget, additive_channels, omitting_channels = self.delete_previous_action(self, action, prev_action)
-    additive_budget += self.add_to_network_and_active_channels(self, additive_channels)
+    additive_budget, additive_channels, omitting_channels = self.delete_previous_action_differences(action, prev_action)
+    additive_budget += self.add_to_network_and_active_channels(additive_channels)
     
     return additive_budget, additive_channels, omitting_channels
   
@@ -311,9 +311,10 @@ class simulator():
     
     #removing omitting channels from amount graphs
     for key in omitting_channels :
-      for amount, graph in self.graphs_dict:
-        graph.remove(self.src,key)
-        graph.remove(key,self.src)
+      for amount, graph in self.graphs_dict.items():
+        print("Removing: ")
+        graph.remove_edge(self.src,key)
+        graph.remove_edge(key,self.src)
       
     
     midpoint = len(fees) // 2
@@ -322,7 +323,7 @@ class simulator():
     #adding channels with weight to relevant amount graphs
     for i in range(len(additive_ind)):
       trg, bal = additive_ind[i], additive_bal[i]
-      for amount, graph in self.graphs_dict:
+      for amount, graph in self.graphs_dict.items():
         if bal >= amount:
           graph.add_edge(trg,self.src,weight = base_fees[2*i]*amount + fee_rates[2*i])
           graph.add_edge(self.src,trg,weight = base_fees[2*i + 1]*amount + fee_rates[2*i + 1])
@@ -617,9 +618,11 @@ class simulator():
     bases = []
     rates = []
     midpoint = len(additive_channels) // 2
-    for trg in additive_channels[:midpoint]:
+    additive_channels = additive_channels[:midpoint]
+    for trg in range (len(additive_channels)):
+      print("additive_channels:", additive_channels)
+      print("trg:", trg)
       base,rate = self.fee_policy[additive_channels[trg]]
-      
       bases.extend([base, base])
       rates.extend([rate, rate])
       

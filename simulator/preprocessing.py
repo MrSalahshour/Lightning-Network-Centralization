@@ -189,6 +189,8 @@ def get_init_parameters(providers, directed_edges, src, trgs, channel_ids, chann
     }).reset_index()[["src","fee_base_msat","fee_rate_milli_msat"]]
     for i in range(len(temp)):
         fee_policy_dict[temp["src"][i]] = (temp["fee_base_msat"][i], temp["fee_rate_milli_msat"][i])
+
+     
     
     network_dictionary, nodes, sub_providers, sub_edges = create_sub_network(directed_edges, providers, src, trgs,
                                                                              channel_ids, local_size, manual_balance, initial_balances, capacities)
