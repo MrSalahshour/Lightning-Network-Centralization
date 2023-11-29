@@ -30,7 +30,7 @@ def main():
     parser.add_argument('--max_episode_length', type=int, default=200)
     parser.add_argument('--local_size', type=int, default=100)
     parser.add_argument('--counts', default=[10, 10, 10], type=lambda s: [int(item) for item in s.split(',')])
-    parser.add_argument('--amounts', default=[10000, 50000, 100000], type=lambda s: [int(item) for item in s.split(',')])
+    parser.add_argument('--amounts', default=[5, 5, 5], type=lambda s: [int(item) for item in s.split(',')])
     parser.add_argument('--epsilons', default=[.6, .6, .6], type=lambda s: [float(item) for item in s.split(',')])
     parser.add_argument('--manual_balance', default=False)
     parser.add_argument('--initial_balances', default=[], type=lambda s: [int(item) for item in s.split(',')])

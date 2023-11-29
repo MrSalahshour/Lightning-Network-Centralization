@@ -158,7 +158,7 @@ class simulator():
         
         if trg in prev_action[:midpoint_prev_action]:
           budget += self.network_dictionary[(self.src, trg)][0]
-          omitting_channels.append([trg])
+          omitting_channels.append(trg)
           del self.network_dictionary[(self.src, trg)]
           del self.network_dictionary[(trg, self.src)]
           
@@ -169,7 +169,7 @@ class simulator():
     for trg in prev_action[:midpoint_prev_action]:
       if trg not in action[:midpoint_action]:
           budget += self.network_dictionary[(self.src, trg)][0]
-          omitting_channels.append([trg])
+          omitting_channels.append(trg)
           del self.network_dictionary[(self.src, trg)]
           del self.network_dictionary[(trg, self.src)]
           
@@ -312,9 +312,12 @@ class simulator():
     #removing omitting channels from amount graphs
     for key in omitting_channels :
       for amount, graph in self.graphs_dict.items():
-        print("Removing: ")
-        graph.remove_edge(self.src,key)
-        graph.remove_edge(key,self.src)
+        print("Removing : ")
+        print("ommitting channels:",omitting_channels)
+        print("key in ommitting channels:",key)
+        if graph.has_edge(self.src,key):
+          graph.remove_edge(self.src,key)
+          graph.remove_edge(key,self.src)
       
     
     midpoint = len(fees) // 2
@@ -324,7 +327,10 @@ class simulator():
     for i in range(len(additive_ind)):
       trg, bal = additive_ind[i], additive_bal[i]
       for amount, graph in self.graphs_dict.items():
+        print("amount:",amount)
+        print("bal:",bal)
         if bal >= amount:
+          print("Adding")
           graph.add_edge(trg,self.src,weight = base_fees[2*i]*amount + fee_rates[2*i])
           graph.add_edge(self.src,trg,weight = base_fees[2*i + 1]*amount + fee_rates[2*i + 1])
           

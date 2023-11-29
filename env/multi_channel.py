@@ -107,7 +107,7 @@ class FeeEnv(gym.Env):
         self.max_balance = 1000
         self.max_transaction_amount = 1000
 
-        self.observation_space = MultiDiscrete([2] * (self.n_nodes) + [self.max_balance] * (self.n_nodes) + [self.max_transaction_amount] * (self.n_nodes))
+        self.observation_space = MultiDiscrete([2] * (self.n_nodes) + [self.max_balance + 1] * (self.n_nodes) + [self.max_transaction_amount + 1] * (self.n_nodes))
             
         # Initial values of each channel for fee selection mode
         # self.initial_balances = data['initial_balances']
