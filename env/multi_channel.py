@@ -105,7 +105,7 @@ class FeeEnv(gym.Env):
         #Please note that the dimensions for balance and transaction amounts start from n_nodes and n_nodes + n_channels respectively. This allows us to separate the node connection information from the channel balance and transaction amounts.
 
         self.max_balance = 1000
-        self.max_transaction_amount = 1000
+        self.max_transaction_amount = 100000
 
         self.observation_space = MultiDiscrete([2] * (self.n_nodes) + [self.max_balance + 1] * (self.n_nodes) + [self.max_transaction_amount + 1] * (self.n_nodes))
             
@@ -175,11 +175,11 @@ class FeeEnv(gym.Env):
         print("step called")
         # Execute one time step within the environment
         # The second part of the action is action[midpoint:]
-        print("first action :",action)
+        # print("first action :",action)
         action_idx = action.copy()
             
         action = self.action_fix_index_to_capacity(self.capacities,action)
-        print("action after capcities fixed:",action)
+        # print("action after capcities fixed:",action)
         # action = self.action_fix_to_id_format(action)
         action = self.aggregate_action(action)
         print("action after aggregation fixed:",action)
@@ -222,6 +222,8 @@ class FeeEnv(gym.Env):
                             np.multiply(action[self.n_channel:2 * self.n_channel], transaction_numbers))
 
             # Running simulator for a certain time interval
+            print("prev_action:", self.prev_action)
+            print("time_step: ", self.time_step)
             
             
 
