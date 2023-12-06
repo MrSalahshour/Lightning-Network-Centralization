@@ -312,9 +312,9 @@ class simulator():
     #removing omitting channels from amount graphs
     for key in omitting_channels :
       for amount, graph in self.graphs_dict.items():
-        print("Removing : ")
-        print("ommitting channels:",omitting_channels)
-        print("key in ommitting channels:",key)
+        # print("Removing : ")
+        # print("ommitting channels:",omitting_channels)
+        # print("key in ommitting channels:",key)
         if graph.has_edge(self.src,key): #NOTE: why we should check? does it even added?
           graph.remove_edge(self.src,key)
         if graph.has_edge(self.src,key):
@@ -328,21 +328,21 @@ class simulator():
     for i in range(len(additive_ind)):
       trg, bal = additive_ind[i], additive_bal[i]
       for amount, graph in self.graphs_dict.items():
-        print("amount:",amount)
-        print("bal:",bal)
+        # print("amount:",amount)
+        # print("bal:",bal)
         if bal >= amount:
-          print("Adding")
+          # print("Adding")
           graph.add_edge(trg,self.src,weight = base_fees[2*i]*amount + fee_rates[2*i])
           graph.add_edge(self.src,trg,weight = base_fees[2*i + 1]*amount + fee_rates[2*i + 1])
 
 
 
-    print("Nodes of the graph: ")
-    print(graph.nodes())
+    # print("Nodes of the graph: ")
+    # print(graph.nodes())
 
-    # Print edges
-    print("Edges of the graph: ")
-    print(graph.edges())
+    # # Print edges
+    # print("Edges of the graph: ")
+    # print(graph.edges())
 
     
           
@@ -638,8 +638,8 @@ class simulator():
     midpoint = len(additive_channels) // 2
     additive_channels = additive_channels[:midpoint]
     for trg in range (len(additive_channels)):
-      print("additive_channels:", additive_channels)
-      print("trg:", trg)
+      # print("additive_channels:", additive_channels)
+      # print("trg:", trg)
       base,rate = self.fee_policy[additive_channels[trg]]
       bases.extend([base, base])
       rates.extend([rate, rate])

@@ -104,8 +104,8 @@ class FeeEnv(gym.Env):
         #The second part is 2*n_channels with the values corresponding to the balance of each channel and also accumulative transaction amounts in each time step.
         #Please note that the dimensions for balance and transaction amounts start from n_nodes and n_nodes + n_channels respectively. This allows us to separate the node connection information from the channel balance and transaction amounts.
 
-        self.max_balance = 1000
-        self.max_transaction_amount = 100000
+        self.max_balance = 100
+        self.max_transaction_amount = 100
 
         self.observation_space = MultiDiscrete([2] * (self.n_nodes) + [self.max_balance + 1] * (self.n_nodes) + [self.max_transaction_amount + 1] * (self.n_nodes))
             
@@ -172,7 +172,7 @@ class FeeEnv(gym.Env):
     
     
     def step(self, action):
-        print("step called")
+        # print("step called")
         # Execute one time step within the environment
         # The second part of the action is action[midpoint:]
         # print("first action :",action)
@@ -182,48 +182,53 @@ class FeeEnv(gym.Env):
         # print("action after capcities fixed:",action)
         # action = self.action_fix_to_id_format(action)
         action = self.aggregate_action(action)
-        print("action after aggregation fixed:",action)
+        # print("action after aggregation fixed:",action)
         midpoint = len(action) // 2
         # updating trgs in simulator
         self.simulator.trgs = action[:midpoint]
         self.n_channel = midpoint
-        
+
+        violation = False
+         
         '''
         In the following couple of lines, new channels are being added to the network, along with active_
         _channels dict and also, channels not present anymore, will be deleted
         '''
-        
+        violation = False
         additive_budget, additive_channels, ommitive_channels = self.simulator.update_network_and_active_channels(action, self.prev_action)
-        if self.maximum_capacity+additive_budget<0:
-            reward = -np.inf
-            action = self.prev_action
+
         
-        else:
-            reward = 0
-            if self.mode == "channel_openning":
-                self.prev_action = action
-        
-                #TODO: #11 set reasonable fees
-                fees = self.simulator.get_channel_fees(action)
-                
+        if self.mode == "channel_openning":
+            self.prev_action = action
+    
+            #TODO: #11 set reasonable fees
+            fees = self.simulator.get_channel_fees(action)
+            
+
+            self.simulator.update_amount_graph(additive_channels, ommitive_channels,fees)
+            # sum_second_part = np.sum(action[midpoint:]) 
+            
+            balances, transaction_amounts, transaction_numbers = self.simulate_transactions(fees,additive_channels,ommitive_channels)
+            
+            fees = fees[::2]
+            if self.maximum_capacity+additive_budget<0:
+                reward = -100
+                #NOTE: how to detemine this value of reward for violating(-inf cause infinite episode avg mean which is not okay and cause problems)
+                violation = True
+
+            else:
                 #updating the available budget
                 self.maximum_capacity += additive_budget
-                self.simulator.update_amount_graph(additive_channels, ommitive_channels,fees)
-                # sum_second_part = np.sum(action[midpoint:]) 
-                
-                balances, transaction_amounts, transaction_numbers = self.simulate_transactions(fees,additive_channels,ommitive_channels)
-                
-                fees = fees[::2]
                 reward = 1e-6 * np.sum(np.multiply(fees[0:self.n_channel], transaction_amounts) + \
-                            np.multiply(fees[self.n_channel:], transaction_numbers))
-            else:
-                balances, transaction_amounts, transaction_numbers = self.simulate_transactions(action)
-                reward = 1e-6 * np.sum(np.multiply(action[0:self.n_channel], transaction_amounts) + \
-                            np.multiply(action[self.n_channel:2 * self.n_channel], transaction_numbers))
+                        np.multiply(fees[self.n_channel:], transaction_numbers))
+        else:
+            balances, transaction_amounts, transaction_numbers = self.simulate_transactions(action)
+            reward = 1e-6 * np.sum(np.multiply(action[0:self.n_channel], transaction_amounts) + \
+                        np.multiply(action[self.n_channel:2 * self.n_channel], transaction_numbers))
 
-            # Running simulator for a certain time interval
-            print("prev_action:", self.prev_action)
-            print("time_step: ", self.time_step)
+        # Running simulator for a certain time interval
+        # print("prev_action:", self.prev_action)
+        # print("time_step: ", self.time_step)
             
             
 
@@ -234,16 +239,19 @@ class FeeEnv(gym.Env):
         connected_nodes = np.zeros((self.n_nodes,))
         balances_list = np.zeros((self.n_nodes,))
         transaction_amounts_list = np.zeros((self.n_nodes,))
+        if violation == False: 
+            for idx in range (len(action_idx[:midpoint])):
+                connected_nodes[action_idx[idx]] = 1
+                balances_list[action_idx[idx]] = balances[idx]
+                transaction_amounts_list[action_idx[idx]] = transaction_amounts[idx]
 
-        for idx in range (len(action_idx[:midpoint])):
-            connected_nodes[action_idx[idx]] = 1
-            balances_list[action_idx[idx]] = balances[idx]
-            transaction_amounts_list[action_idx[idx]] = transaction_amounts[idx]
-            
+        else:
+            print("....................VIOLAION IN BUDGET...........................")            
+        #NOTE: what we should we do to the state if we vilaote (for now we set all connections and transactions and balance to zero)    
         if self.mode == "fee_setting":
             self.state = np.append(balances, transaction_amounts)/1000
         else:
-            self.state = np.concatenate((connected_nodes, balances_list,transaction_amounts_list))
+            self.state = np.concatenate((connected_nodes, (balances_list)/10000,(transaction_amounts_list)/10000))
 
         return self.state, reward, done, info
 
