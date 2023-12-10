@@ -206,7 +206,7 @@ class FeeEnv(gym.Env):
             
             fees = fees[::2]
             if self.maximum_capacity+additive_budget<0:
-                reward = 0
+                reward = -0.01
                 #NOTE: how to detemine this value of reward for violating(-inf cause infinite episode avg mean which is not okay and cause problems)
                 violation = True
 

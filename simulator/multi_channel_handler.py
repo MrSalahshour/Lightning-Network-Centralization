@@ -19,7 +19,7 @@ def get_min_balance(network_dictionary, path):
       trg = path[i+1]
       src_trg = network_dictionary[(src,trg)]
       edge_balance = src_trg[0]
-      if (edge_balance<min_balance)
+      if (edge_balance<min_balance):
         min_balance = edge_balance    
   return min_balance
 
