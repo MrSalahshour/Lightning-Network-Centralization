@@ -188,7 +188,8 @@ def get_init_parameters(providers, directed_edges, src, trgs, channel_ids, chann
         "fee_rate_milli_msat": "median",
     }).reset_index()[["src","fee_base_msat","fee_rate_milli_msat"]]
     for i in range(len(temp)):
-        fee_policy_dict[temp["src"][i]] = (temp["fee_base_msat"][i], temp["fee_rate_milli_msat"][i])
+        fee_policy_dict[temp["src"][i]] = (0, 0.01)
+        # fee_policy_dict[temp["src"][i]] = (temp["fee_base_msat"][i], temp["fee_rate_milli_msat"][i])
 
      
     

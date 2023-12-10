@@ -206,14 +206,14 @@ class FeeEnv(gym.Env):
             
             fees = fees[::2]
             if self.maximum_capacity+additive_budget<0:
-                reward = -0.1
+                reward = 0
                 #NOTE: how to detemine this value of reward for violating(-inf cause infinite episode avg mean which is not okay and cause problems)
                 violation = True
 
             else:
                 #updating the available budget
                 self.maximum_capacity += additive_budget
-                reward = 1e-6 * np.sum(np.multiply(fees[0:self.n_channel], transaction_amounts) + \
+                reward = np.sum(np.multiply(fees[0:self.n_channel], transaction_amounts) + \
                         np.multiply(fees[self.n_channel:], transaction_numbers))
         else:
             balances, transaction_amounts, transaction_numbers = self.simulate_transactions(action)
