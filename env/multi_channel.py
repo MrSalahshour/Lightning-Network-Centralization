@@ -58,7 +58,7 @@ class FeeEnv(gym.Env):
         # Source node
         self.src = data['src'] 
         self.prev_action = []
-        
+        self.prev_violation = False
         #NOTE: added attribute
         self.n_nodes = len(data['nodes']) - 1 # nodes should be mines one to doesnt't include our node
         self.graph_nodes = list(data['nodes'])
@@ -172,23 +172,17 @@ class FeeEnv(gym.Env):
     
     
     def step(self, action):
-        # print("step called")
         # Execute one time step within the environment
         # The second part of the action is action[midpoint:]
-        # print("first action :",action)
         action_idx = action.copy()
             
         action = self.action_fix_index_to_capacity(self.capacities,action)
-        # print("action after capcities fixed:",action)
         # action = self.action_fix_to_id_format(action)
         action = self.aggregate_action(action)
-        # print("action after aggregation fixed:",action)
         midpoint = len(action) // 2
         # updating trgs in simulator
         self.simulator.trgs = action[:midpoint]
         self.n_channel = midpoint
-
-        violation = False
          
         '''
         In the following couple of lines, new channels are being added to the network, along with active_
@@ -212,7 +206,7 @@ class FeeEnv(gym.Env):
             
             fees = fees[::2]
             if self.maximum_capacity+additive_budget<0:
-                reward = -100
+                reward = -0.1
                 #NOTE: how to detemine this value of reward for violating(-inf cause infinite episode avg mean which is not okay and cause problems)
                 violation = True
 
@@ -235,6 +229,8 @@ class FeeEnv(gym.Env):
         self.time_step += 1
         info = {'TimeLimit.truncated': True if self.time_step >= self.max_episode_length else False}
         done = self.time_step >= self.max_episode_length
+        if self.prev_violation == True:
+            done = True
         
         connected_nodes = np.zeros((self.n_nodes,))
         balances_list = np.zeros((self.n_nodes,))
@@ -246,12 +242,13 @@ class FeeEnv(gym.Env):
                 transaction_amounts_list[action_idx[idx]] = transaction_amounts[idx]
 
         else:
+            self.prev_violation = True
             print("....................VIOLAION IN BUDGET...........................")            
         #NOTE: what we should we do to the state if we vilaote (for now we set all connections and transactions and balance to zero)    
         if self.mode == "fee_setting":
             self.state = np.append(balances, transaction_amounts)/1000
         else:
-            self.state = np.concatenate((connected_nodes, (balances_list)/10000,(transaction_amounts_list)/10000))
+            self.state = np.concatenate((connected_nodes, (balances_list)/1000,(transaction_amounts_list)/1000))
 
         return self.state, reward, done, info
 
