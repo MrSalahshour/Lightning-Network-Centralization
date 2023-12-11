@@ -129,10 +129,10 @@ class simulator():
         
 # Complementary
   def update_network_and_active_channels(self, action, prev_action):
-    additive_budget, additive_channels, omitting_channels = self.delete_previous_action_differences(action, prev_action)
-    additive_budget += self.add_to_network_and_active_channels(additive_channels)
-    
-    return additive_budget, additive_channels, omitting_channels
+    additive_channels, omitting_channels = self.delete_previous_action_differences(action, prev_action)
+    self.add_to_network_and_active_channels(additive_channels)
+    #add budgets if needed, format can be achieved via looking into functions
+    return additive_channels, omitting_channels
   
   # Complementary
   def delete_previous_action_differences(self, action, prev_action):
@@ -143,9 +143,9 @@ class simulator():
     
     midpoint_prev_action = len(prev_action) // 2
     if midpoint_prev_action == 0:
-      return 0, action, []
+      return action, []
     
-    budget = 0
+    # budget = 0
     midpoint_action = len(action) // 2
     additive_idx = []
     additive_bal = []
@@ -157,7 +157,7 @@ class simulator():
         additive_bal.append(bal)
         
         if trg in prev_action[:midpoint_prev_action]:
-          budget += self.network_dictionary[(self.src, trg)][0]
+          # budget += self.network_dictionary[(self.src, trg)][0]
           omitting_channels.append(trg)
           del self.network_dictionary[(self.src, trg)]
           del self.network_dictionary[(trg, self.src)]
@@ -168,7 +168,7 @@ class simulator():
     # trgs in prev_action and not in action anymore      
     for trg in prev_action[:midpoint_prev_action]:
       if trg not in action[:midpoint_action]:
-          budget += self.network_dictionary[(self.src, trg)][0]
+          # budget += self.network_dictionary[(self.src, trg)][0]
           omitting_channels.append(trg)
           del self.network_dictionary[(self.src, trg)]
           del self.network_dictionary[(trg, self.src)]
@@ -176,8 +176,8 @@ class simulator():
           del self.active_channels[(self.src, trg)]
           del self.active_channels[(trg, self.src)]
         
-    
-    return budget, additive_idx+additive_bal, omitting_channels
+    #add budget in output if needed
+    return additive_idx+additive_bal, omitting_channels
     
   # Complementary
   def add_to_network_and_active_channels(self, additive_channels):
@@ -185,12 +185,13 @@ class simulator():
     In this function, channels of new action will be added to the network iff they are new channels
     or have new capacities assigned.
     '''
-    if additive_channels == []:
+    if not additive_channels:
       return 0
     
     midpoint = len(additive_channels) // 2
     cumulative_budget = 0
     for trg, bal in zip(additive_channels[:midpoint], additive_channels[midpoint:]):
+      # [balance, fee_base, fee_rate, capacity]
       self.network_dictionary[(self.src, trg)] = [bal, None, None, 2* bal]
       self.network_dictionary[(trg, self.src)] = [bal, None, None, 2* bal]
       
