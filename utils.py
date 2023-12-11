@@ -150,6 +150,12 @@ def get_fee_based_on_strategy(state, strategy, directed_edges, node_index):
         raise NotImplementedError
     return action, rescale
 
+def get_channels_and_capacities_based_on_strategy(state, strategy, directed_edges):
+    # if strategy == 'random':
+    #TODO: define basline strategy for random choose channels and capacities index.
+
+    return action
+
 
 def get_mean_fee(directed_edges, number_of_channels):
     mean_alpha = directed_edges['fee_rate_milli_msat'].mean()
