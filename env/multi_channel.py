@@ -94,7 +94,7 @@ class FeeEnv(gym.Env):
 
         # self.action_space = spaces.MultiDiscrete([self.n_nodes for _ in range(self.n_channel)] + [len(self.capacities) for _ in range(self.n_channel)])
         # self.action_space = Box(low = 0, high = max_capacity, shape=(self.n_nodes,), dtype=np.float32)
-        self.action_space = spaces.MultiDiscrete([self.n_nodes for _ in range(self.n_channel)] + [10 for _ in range(self.n_channel)])
+        self.action_space = spaces.MultiDiscrete([self.n_nodes for _ in range(self.n_channel)] + [50 for _ in range(self.n_channel)])
 
 
 
@@ -106,7 +106,7 @@ class FeeEnv(gym.Env):
 
         # self.max_balance = 100
         self.max_transaction_amount = 100
-        self.budget_scaling_constant = 1000
+        self.budget_scaling_constant = 10
 
         # self.observation_space = MultiDiscrete([2] * (self.n_nodes) + [self.max_balance + 1] * (self.n_nodes) + [self.max_transaction_amount + 1] * (self.n_nodes))
         self.observation_space = MultiDiscrete([2] * (self.n_nodes) + [self.maximum_capacity/self.budget_scaling_constant] * (self.n_nodes) + [self.max_transaction_amount + 1] * (self.n_nodes))
@@ -177,11 +177,13 @@ class FeeEnv(gym.Env):
         # Execute one time step within the environment
         # The second part of the action is action[midpoint:]
         action_idx = action.copy()
-            
+        # print("action:",action)    
         # action = self.action_fix_index_to_capacity(self.capacities,action)
         # action = self.action_fix_to_id_format(action)
         action = self.aggregate_action(action)
+        # print("action after aggregate:",action)  
         action = self.map_action_to_capacity(action)
+        # print("action after map action to capacity:",action)  
         midpoint = len(action) // 2
         # updating trgs in simulator
         self.simulator.trgs = action[:midpoint]
@@ -231,6 +233,8 @@ class FeeEnv(gym.Env):
             
 
         self.time_step += 1
+        if self.time_step%100==0:
+            print("action",action)
         info = {'TimeLimit.truncated': True if self.time_step >= self.max_episode_length else False}
         done = self.time_step >= self.max_episode_length
         # if self.prev_violation == True:
@@ -301,14 +305,14 @@ class FeeEnv(gym.Env):
                 fixed_indices.append(i)
                 fixed_action.append(action[i+midpoint])
         
-        fixed_action = softmax(np.array(fixed_action)) * self.maximum_capacity
+        if len(fixed_action) != 0:
+            fixed_action = softmax(np.array(fixed_action)) * self.maximum_capacity
         
         #putting into action
         output = [0] * midpoint
-        iterator = iter(fixed_action)
         for i in range(len(fixed_indices)):
             output[fixed_indices[i]] = fixed_action[i]
-            
+        
         return fixed_trgs+output
                 
             
