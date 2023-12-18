@@ -39,6 +39,7 @@ def main():
     parser.add_argument('--max_capacity', type = int, default=10000) 
     parser.add_argument('--n_channels', type=int, default=2)
     parser.add_argument('--mode', type=str, default='channel_openning')#TODO: add this arg to all scripts
+    parser.add_argument('--capacity_upper_scale_bound', type=int, default=50)
 
     
     args = parser.parse_args()
@@ -61,7 +62,8 @@ def main():
                   'initial_balances': args.initial_balances,
                   'capacities': args.capacities,
                   'max_capacity': args.max_capacity,
-                  'n_channels': args.n_channels}
+                  'n_channels': args.n_channels,
+                  'capacity_upper_scale_bound': args.capacity_upper_scale_bound}
 
     for seed in range(args.n_seed):
         train(env_params, train_params,

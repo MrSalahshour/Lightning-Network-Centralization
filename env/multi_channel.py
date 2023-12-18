@@ -56,7 +56,7 @@ class FeeEnv(gym.Env):
     We are adding the income from each payment to balance of the corresponding channel.
     """
 
-    def __init__(self, mode, data, max_capacity, fee_base_upper_bound, max_episode_length, number_of_transaction_types, counts, amounts, epsilons, seed):
+    def __init__(self, mode, data, max_capacity, fee_base_upper_bound, max_episode_length, number_of_transaction_types, counts, amounts, epsilons,capacity_upper_scale_bound, seed):
         # Source node
         self.src = data['src'] 
         self.prev_action = []
@@ -94,7 +94,7 @@ class FeeEnv(gym.Env):
 
         # self.action_space = spaces.MultiDiscrete([self.n_nodes for _ in range(self.n_channel)] + [len(self.capacities) for _ in range(self.n_channel)])
         # self.action_space = Box(low = 0, high = max_capacity, shape=(self.n_nodes,), dtype=np.float32)
-        self.action_space = spaces.MultiDiscrete([self.n_nodes for _ in range(self.n_channel)] + [50 for _ in range(self.n_channel)])
+        self.action_space = spaces.MultiDiscrete([self.n_nodes for _ in range(self.n_channel)] + [capacity_upper_scale_bound for _ in range(self.n_channel)])
 
 
 
@@ -105,8 +105,8 @@ class FeeEnv(gym.Env):
         #Please note that the dimensions for balance and transaction amounts start from n_nodes and n_nodes + n_channels respectively. This allows us to separate the node connection information from the channel balance and transaction amounts.
 
         # self.max_balance = 100
-        self.max_transaction_amount = 100
-        self.budget_scaling_constant = 10
+        self.max_transaction_amount = 1000
+        self.budget_scaling_constant = 1
 
         # self.observation_space = MultiDiscrete([2] * (self.n_nodes) + [self.max_balance + 1] * (self.n_nodes) + [self.max_transaction_amount + 1] * (self.n_nodes))
         self.observation_space = MultiDiscrete([2] * (self.n_nodes) + [self.maximum_capacity/self.budget_scaling_constant] * (self.n_nodes) + [self.max_transaction_amount + 1] * (self.n_nodes))

@@ -57,7 +57,8 @@ if __name__ == '__main__':
                   'epsilons': args.epsilons,
                   'manual_balance': args.manual_balance,
                   'initial_balances': args.initial_balances,
-                  'capacities': args.capacities}
+                  'capacities': args.capacities,
+                  'capacity_upper_scale_bound': args.capacity_upper_scale_bound}
 
     algos = ['PPO', 'TRPO', 'SAC', 'TD3', 'A2C', 'DDPG']
     algo_reward_dict = dict()
