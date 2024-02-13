@@ -45,7 +45,7 @@ def make_env(data, env_params, seed):
         env_params['epsilons']), "number of transaction types missmatch"
     env = FeeEnv(env_params["mode"],data,env_params['max_capacity'], env_params['fee_base_upper_bound'], env_params['max_episode_length'],
                  len(env_params['counts']),
-                 env_params['counts'], env_params['amounts'], env_params['epsilons'],
+                 env_params['counts'], env_params['amounts'], env_params['epsilons'],env_params['capacity_upper_scale_bound'],
                  seed)
 
     return env
@@ -150,12 +150,23 @@ def get_fee_based_on_strategy(state, strategy, directed_edges, node_index):
         raise NotImplementedError
     return action, rescale
 
-def get_channels_and_capacities_based_on_strategy(state, strategy, directed_edges):
-    # if strategy == 'random':
+def get_channels_and_capacities_based_on_strategy(state, strategy, directed_edges,capacity_upper_scale_bound,n_channels,n_nodes):
+    if strategy == 'random':
+        action = get_random_channels_and_capacities(capacity_upper_scale_bound,n_channels,n_nodes)
     #TODO: define basline strategy for random choose channels and capacities index.
 
     return action
+def get_random_channels_and_capacities(capacity_upper_scale_bound,n_channels,n_nodes):
+    if n_nodes < n_channels:
+        raise "Error: n_nodes must be greater than or equal to n_channels"
+    
+    # Create a vector of zeros of size n_nodes
+    vector1 = np.random.randint(0, n_nodes, n_channels).tolist()
+    
+    # Create a vector of size n_channels with random integers between 0 and 50
+    vector2 = np.random.randint(0, capacity_upper_scale_bound + 1, n_channels).tolist()
 
+    return vector1+ vector2
 
 def get_mean_fee(directed_edges, number_of_channels):
     mean_alpha = directed_edges['fee_rate_milli_msat'].mean()

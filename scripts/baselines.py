@@ -18,8 +18,10 @@ def evaluate(mode,strategy, env, env_params, gamma):
             state = state*1000
         else:
             #NOTE: should define a evaluation functions here to use as balinese evaluation for channel selection fee.
-            action = get_channels_and_capacities_based_on_strategy(state, strategy, directed_edges)
-            state, reward, done, info = env.step(action, rescale = False)
+            action = get_channels_and_capacities_based_on_strategy(state, strategy, directed_edges,env_params['capacity_upper_scale_bound']
+                                                                   ,env_params['n_channels'],env_params['local_size'])
+            print("ACTION",action)
+            state, reward, done, info = env.step(action)
         rewards.append(reward)
         print(reward)
 
@@ -33,24 +35,30 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser(description='Baselines')
-    parser.add_argument('--strategy', choices=['static', 'proportional', 'match_peer'], default='static', required=False)
+    parser.add_argument('--strategy', choices=['static', 'proportional', 'match_peer','random'], default='static', required=False)
     parser.add_argument('--data_path', default='data/data.json')
     parser.add_argument('--merchants_path', default='data/merchants.json')
+    # parser.add_argument('--tb_log_dir', default='plotting/tb_results')
+    # parser.add_argument('--tb_name', required=False)
+    parser.add_argument('--node_index', type=int, default=76620) #97851
+    parser.add_argument('--log_dir', default='plotting/tb_results/trained_model/')
+    parser.add_argument('--n_seed', type=int, default=1) # 5
     parser.add_argument('--fee_base_upper_bound', type=int, default=10000)
-    parser.add_argument('--max_episode_length', type=int, default=20)
-    parser.add_argument('--n_seed', type=int, default=1)  # 5
+    parser.add_argument('--total_timesteps', type=int, default=100000)
+    parser.add_argument('--max_episode_length', type=int, default=200)
     parser.add_argument('--local_size', type=int, default=100)
-    parser.add_argument('--node_index', type=int, default=71555)  # 97851
     parser.add_argument('--counts', default=[10, 10, 10], type=lambda s: [int(item) for item in s.split(',')])
-    parser.add_argument('--amounts', default=[10000, 50000, 100000],
-                        type=lambda s: [int(item) for item in s.split(',')])
-    parser.add_argument('--epsilons', default=[.6, .6, .6], type=lambda s: [int(item) for item in s.split(',')])
-    parser.add_argument('--manual_balance', default=True)
-    parser.add_argument('--initial_balances', default= [214642, 589538, 9179347, 428493, 693709, 932820], type=lambda s: [int(item) for item in s.split(',')])
-    parser.add_argument('--capacities', default= [221435, 1000000, 16777215, 1500000, 1000000, 1000000], type=lambda s: [int(item) for item in s.split(',')])
-    parser.add_argument('--max_capacity', type = int, default=1000) 
+    parser.add_argument('--amounts', default=[5, 5, 5], type=lambda s: [int(item) for item in s.split(',')])
+    parser.add_argument('--epsilons', default=[.6, .6, .6], type=lambda s: [float(item) for item in s.split(',')])
+    parser.add_argument('--manual_balance', default=False)
+    parser.add_argument('--initial_balances', default=[], type=lambda s: [int(item) for item in s.split(',')])
+    parser.add_argument('--capacities', default=[],type=lambda s: [int(item) for item in s.split(',')])
+    parser.add_argument('--device', default='auto')
+    parser.add_argument('--max_capacity', type = int, default=10000) 
     parser.add_argument('--n_channels', type=int, default=2)
-    parser.add_argument('--mode', type=str, default='channel_openning')
+    parser.add_argument('--mode', type=str, default='channel_openning')#TODO: add this arg to all scripts
+    parser.add_argument('--capacity_upper_scale_bound', type=int, default=50)
+
 
     args = parser.parse_args()
 
@@ -69,7 +77,8 @@ if __name__ == '__main__':
                   'initial_balances': args.initial_balances,
                   'capacities': args.capacities,
                   'max_capacity': args.max_capacity,
-                  'n_channels': args.n_channels}
+                  'n_channels': args.n_channels,
+                  'capacity_upper_scale_bound': args.capacity_upper_scale_bound}
 
 
     strategy = args.strategy
