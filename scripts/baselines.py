@@ -19,7 +19,9 @@ def evaluate(mode,strategy, env, env_params, gamma):
         else:
             #NOTE: should define a evaluation functions here to use as balinese evaluation for channel selection fee.
             action = get_channels_and_capacities_based_on_strategy(state, strategy, directed_edges,env_params['capacity_upper_scale_bound']
-                                                                   ,env_params['n_channels'],env_params['local_size'])
+                                                                   ,env_params['n_channels'],env_params['local_size'],
+                                                                data['providers'], data["src"], data["trgs"],data["channel_ids"], env_params["local_size"],
+                                                                env_params["manual_balance"], env_params["initial_balances"], data["capacities"])
             print("ACTION",action)
             state, reward, done, info = env.step(action)
         rewards.append(reward)

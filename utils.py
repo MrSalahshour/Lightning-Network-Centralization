@@ -4,6 +4,7 @@ import sb3_contrib
 import secrets
 from simulator import preprocessing
 from env.multi_channel import FeeEnv
+import networkx as nx
 
 
 def make_agent(env, algo, device, tb_log_dir):
@@ -150,12 +151,22 @@ def get_fee_based_on_strategy(state, strategy, directed_edges, node_index):
         raise NotImplementedError
     return action, rescale
 
-def get_channels_and_capacities_based_on_strategy(state, strategy, directed_edges,capacity_upper_scale_bound,n_channels,n_nodes):
+def get_channels_and_capacities_based_on_strategy(state, strategy, directed_edges,capacity_upper_scale_bound,n_channels,n_nodes,
+                                                providers, src, trgs,channel_ids, local_size, manual_balance, initial_balances, capacities):
     if strategy == 'random':
         action = get_random_channels_and_capacities(capacity_upper_scale_bound,n_channels,n_nodes)
+    if strategy == 'top_k_betweenness':
+        action = get_top_k_betweenness(directed_edges, providers, src, trgs,channel_ids, local_size, manual_balance, initial_balances, capacities)
     #TODO: define basline strategy for random choose channels and capacities index.
 
     return action
+
+def get_top_k_betweenness(directed_edges, providers, src, trgs,channel_ids, local_size, manual_balance, initial_balances, capacities):
+     _, _, _, sub_edges = preprocessing.create_sub_network(directed_edges, providers, src, trgs,
+                                                                             channel_ids, local_size, manual_balance, initial_balances, capacities)
+     G = nx.from_pandas_edgelist(sub_edges, source="src", target="trg",
+                                edge_attr=['channel_id', 'capacity', 'fee_base_msat', 'fee_rate_milli_msat', 'balance'],
+                               create_using=nx.DiGraph())
 def get_random_channels_and_capacities(capacity_upper_scale_bound,n_channels,n_nodes):
     if n_nodes < n_channels:
         raise "Error: n_nodes must be greater than or equal to n_channels"
