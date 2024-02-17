@@ -156,17 +156,26 @@ def get_channels_and_capacities_based_on_strategy(state, strategy, directed_edge
     if strategy == 'random':
         action = get_random_channels_and_capacities(capacity_upper_scale_bound,n_channels,n_nodes)
     if strategy == 'top_k_betweenness':
-        action = get_top_k_betweenness(directed_edges, providers, src, trgs,channel_ids, local_size, manual_balance, initial_balances, capacities)
+        action = get_top_k_betweenness(capacity_upper_scale_bound,n_channels,directed_edges, providers, src, trgs,channel_ids, local_size, manual_balance, initial_balances, capacities)
     #TODO: define basline strategy for random choose channels and capacities index.
 
     return action
 
-def get_top_k_betweenness(directed_edges, providers, src, trgs,channel_ids, local_size, manual_balance, initial_balances, capacities):
+def get_top_k_betweenness(scale, n_channels, directed_edges, providers, src, trgs,channel_ids, local_size, manual_balance, initial_balances, capacities):
      _, _, _, sub_edges = preprocessing.create_sub_network(directed_edges, providers, src, trgs,
                                                                              channel_ids, local_size, manual_balance, initial_balances, capacities)
      G = nx.from_pandas_edgelist(sub_edges, source="src", target="trg",
                                 edge_attr=['channel_id', 'capacity', 'fee_base_msat', 'fee_rate_milli_msat', 'balance'],
                                create_using=nx.DiGraph())
+     
+     nodes_by_betweenness = nx.betweenness_centrality(G)
+     sorted_by_betweenness = dict(sorted(nodes_by_betweenness.items(), key=lambda item: item[1]))
+     top_k_betweenness = list(sorted_by_betweenness.keys())[-n_channels:]
+     top_k_capacity = list(sorted_by_betweenness.values())[-n_channels:]
+     top_k_capacity = [round(scale*elem/sum(top_k_capacity)) for elem in top_k_capacity]
+     
+     return top_k_betweenness + top_k_capacity
+     
 def get_random_channels_and_capacities(capacity_upper_scale_bound,n_channels,n_nodes):
     if n_nodes < n_channels:
         raise "Error: n_nodes must be greater than or equal to n_channels"
