@@ -37,7 +37,7 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser(description='Baselines')
-    parser.add_argument('--strategy', choices=['static', 'proportional', 'match_peer','random'], default='static', required=False)
+    parser.add_argument('--strategy', choices=['static', 'proportional', 'match_peer','random','top_k_betweenness'], default='static', required=False)
     parser.add_argument('--data_path', default='data/data.json')
     parser.add_argument('--merchants_path', default='data/merchants.json')
     # parser.add_argument('--tb_log_dir', default='plotting/tb_results')
