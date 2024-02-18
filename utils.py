@@ -152,24 +152,18 @@ def get_fee_based_on_strategy(state, strategy, directed_edges, node_index):
         raise NotImplementedError
     return action, rescale
 
-def get_channels_and_capacities_based_on_strategy(state, strategy, directed_edges,capacity_upper_scale_bound,n_channels,n_nodes,
-                                                providers, src, trgs,channel_ids, local_size, manual_balance, initial_balances, capacities,graph_nodes):
+def get_channels_and_capacities_based_on_strategy(strategy,capacity_upper_scale_bound,n_channels,n_nodes, src,graph_nodes, graph):
     if strategy == 'random':
         action = get_random_channels_and_capacities(capacity_upper_scale_bound,n_channels,n_nodes)
     if strategy == 'top_k_betweenness':
-        action = get_top_k_betweenness(capacity_upper_scale_bound,n_channels,directed_edges, providers, src, trgs,channel_ids, local_size, manual_balance, initial_balances, capacities,graph_nodes)
+        action = get_top_k_betweenness(capacity_upper_scale_bound,n_channels,src,graph_nodes,graph)
     #TODO: define basline strategy for random choose channels and capacities index.
 
     return action
 
-def get_top_k_betweenness(scale, n_channels, directed_edges, providers, src, trgs,channel_ids, local_size, manual_balance, initial_balances, capacities,graph_nodes):
-     _, _, _, sub_edges = preprocessing.create_sub_network(directed_edges, providers, src, trgs,
-                                                                             channel_ids, local_size, manual_balance, initial_balances, capacities)
-     G = nx.from_pandas_edgelist(sub_edges, source="src", target="trg",
-                                edge_attr=['channel_id', 'capacity', 'fee_base_msat', 'fee_rate_milli_msat', 'balance'],
-                               create_using=nx.DiGraph())
-     
-     nodes_by_betweenness = nx.betweenness_centrality(G)
+def get_top_k_betweenness(scale, n_channels, src, graph_nodes, graph):
+      
+     nodes_by_betweenness = nx.betweenness_centrality(graph).remove(src)
      sorted_by_betweenness = dict(sorted(nodes_by_betweenness.items(), key=lambda item: item[1]))
      top_k_betweenness = list(sorted_by_betweenness.keys())[-n_channels:]
      top_k_betweenness = [graph_nodes.index(item) for item in top_k_betweenness if item in graph_nodes]

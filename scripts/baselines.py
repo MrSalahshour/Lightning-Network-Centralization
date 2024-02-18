@@ -17,11 +17,13 @@ def evaluate(mode,strategy, env, env_params, gamma):
             state, reward, done, info = env.step(action, rescale)
             state = state*1000
         else:
+            #NOTE: Add env_params["scale"], apply to amounts when generating amount graphs
+            if strategy == "top_k_betweenness":
+                graph = env.get_local_graph(scale=230000/(10000/env_params["amounts"][0]))
+            else: graph=None
             #NOTE: should define a evaluation functions here to use as balinese evaluation for channel selection fee.
-            action = get_channels_and_capacities_based_on_strategy(state, strategy, directed_edges,env_params['capacity_upper_scale_bound']
-                                                                   ,env_params['n_channels'],env_params['local_size'],
-                                                                data['providers'], data["src"], data["trgs"],data["channel_ids"], env_params["local_size"],
-                                                                env_params["manual_balance"], env_params["initial_balances"], data["capacities"],env.graph_nodes)
+            action = get_channels_and_capacities_based_on_strategy(strategy,env_params['capacity_upper_scale_bound']
+                                                                   ,env_params['n_channels'],env_params['local_size'], data["src"],env.graph_nodes,graph)
             print("ACTION",action)
             state, reward, done, info = env.step(action)
         rewards.append(reward)
