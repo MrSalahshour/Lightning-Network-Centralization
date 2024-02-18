@@ -49,11 +49,11 @@ class FeeEnv(gym.Env):
 
     ### Rewards
 
-    Since the goal is to maximize the return in long term, reward is sum of incomes from fee payments of each channel.
-    Reward scale is Sat in order to control the upperbound.
+    Since the goal is to maximize the return in the long term, the reward is the sum of incomes from fee payments of each channel.
+    The reward scale is Sat to control the upper bound.
 
     ***Note:
-    We are adding the income from each payment to balance of the corresponding channel.
+    We are adding the income from each payment to the balance of the corresponding channel.
     """
 
     def __init__(self, mode, data, max_capacity, fee_base_upper_bound, max_episode_length, number_of_transaction_types, counts, amounts, epsilons,capacity_upper_scale_bound, seed):
@@ -62,18 +62,18 @@ class FeeEnv(gym.Env):
         self.prev_action = []
         # self.prev_violation = False
         #NOTE: added attribute
-        self.n_nodes = len(data['nodes']) - 1 # nodes should be mines one to doesnt't include our node
+        self.n_nodes = len(data['nodes']) - 1 # nodes should be minus one to doesn't include our node
         self.graph_nodes = list(data['nodes'])
         self.graph_nodes.remove(data['src'])
         print("Nodes: ",self.n_nodes)
         self.mode = mode
         self.trgs = data['trgs']
-        self.n_channel = int(len(data["channel_ids"])/2)
+        self.n_channel = data['n_channels']
         print('action dim:', self.n_nodes)
         
 
-        #TODO: #18 remember that following lines are to be used in if structure after the structure of mode is being implemented
-        #NOTE: following lines are for fee selection mode
+        #TODO: #18 remember that the following lines are to be used in if structure after the structure of mode is being implemented
+        #NOTE: The following lines are for fee selection mode
         '''# Base fee and fee rate for each channel of src
         self.action_space = spaces.Box(low=-1, high=+1, shape=(2 * self.n_channel,), dtype=np.float32)
         self.fee_rate_upper_bound = 1000
@@ -82,8 +82,8 @@ class FeeEnv(gym.Env):
         # Balance and transaction amount of each channel
         self.observation_space = spaces.Box(low=0, high=np.inf, shape=(2 * self.n_channel,), dtype=np.float32)
 
-         # defining action space & edit of step function in multi channel
-        # first n_channels are id's  of connected nodes and the seconds are corresponidg  capacities
+        # Defining action space & editing of step function in multi-channel
+        # first n_channels are id's  of connected nodes and the seconds are corresponding  capacities
         # add self.capacities to the fields of env class'''
 
         #NOTE: the following line is the total budget for the model to utilize in CHANNEL_OPENNING mode
@@ -95,7 +95,6 @@ class FeeEnv(gym.Env):
         # self.action_space = spaces.MultiDiscrete([self.n_nodes for _ in range(self.n_channel)] + [len(self.capacities) for _ in range(self.n_channel)])
         # self.action_space = Box(low = 0, high = max_capacity, shape=(self.n_nodes,), dtype=np.float32)
         self.action_space = spaces.MultiDiscrete([self.n_nodes for _ in range(self.n_channel)] + [capacity_upper_scale_bound for _ in range(self.n_channel)])
-
 
 
 
@@ -181,6 +180,8 @@ class FeeEnv(gym.Env):
         # action = self.action_fix_index_to_capacity(self.capacities,action)
         # action = self.action_fix_to_id_format(action)
         action = self.aggregate_action(action)
+        if self.time_step%100==0:
+            print("action: ",action)
         # print("action after aggregate:",action)  
         action = self.map_action_to_capacity(action)
         # print("action after map action to capacity:",action)  
@@ -233,8 +234,7 @@ class FeeEnv(gym.Env):
             
 
         self.time_step += 1
-        if self.time_step%100==0:
-            print("action",action)
+        
         info = {'TimeLimit.truncated': True if self.time_step >= self.max_episode_length else False}
         done = self.time_step >= self.max_episode_length
         # if self.prev_violation == True:
@@ -254,12 +254,12 @@ class FeeEnv(gym.Env):
         # else:
         #     self.prev_violation = True
         #     print("....................VIOLAION IN BUDGET...........................")            
-        #NOTE: what we should we do to the state if we vilaote (for now we set all connections and transactions and balance to zero)    
+        #NOTE: what should we do to the state if we violate (for now we set all connections and transactions and balance to zero)    
         if self.mode == "fee_setting":
             self.state = np.append(balances, transaction_amounts)/1000
         else:
             #changed from balanced-based to capacity-based
-            self.state = np.concatenate((connected_nodes, (capacities_list)/1000,(transaction_amounts_list)/1000))
+            self.state = np.concatenate((connected_nodes, (capacities_list)/1000, (transaction_amounts_list)/1000))
 
         return self.state, reward, done, info
 

@@ -21,7 +21,7 @@ def evaluate(mode,strategy, env, env_params, gamma):
             action = get_channels_and_capacities_based_on_strategy(state, strategy, directed_edges,env_params['capacity_upper_scale_bound']
                                                                    ,env_params['n_channels'],env_params['local_size'],
                                                                 data['providers'], data["src"], data["trgs"],data["channel_ids"], env_params["local_size"],
-                                                                env_params["manual_balance"], env_params["initial_balances"], data["capacities"])
+                                                                env_params["manual_balance"], env_params["initial_balances"], data["capacities"],env.graph_nodes)
             print("ACTION",action)
             state, reward, done, info = env.step(action)
         rewards.append(reward)
@@ -45,21 +45,21 @@ if __name__ == '__main__':
     parser.add_argument('--node_index', type=int, default=76620) #97851
     parser.add_argument('--log_dir', default='plotting/tb_results/trained_model/')
     parser.add_argument('--n_seed', type=int, default=1) # 5
-    parser.add_argument('--fee_base_upper_bound', type=int, default=10000)
+    parser.add_argument('--fee_base_upper_bound', type=int, default=100)
     parser.add_argument('--total_timesteps', type=int, default=100000)
-    parser.add_argument('--max_episode_length', type=int, default=200)
+    parser.add_argument('--max_episode_length', type=int, default=500)
     parser.add_argument('--local_size', type=int, default=100)
     parser.add_argument('--counts', default=[10, 10, 10], type=lambda s: [int(item) for item in s.split(',')])
-    parser.add_argument('--amounts', default=[5, 5, 5], type=lambda s: [int(item) for item in s.split(',')])
+    parser.add_argument('--amounts', default=[100, 500, 1000], type=lambda s: [int(item) for item in s.split(',')])
     parser.add_argument('--epsilons', default=[.6, .6, .6], type=lambda s: [float(item) for item in s.split(',')])
     parser.add_argument('--manual_balance', default=False)
     parser.add_argument('--initial_balances', default=[], type=lambda s: [int(item) for item in s.split(',')])
     parser.add_argument('--capacities', default=[],type=lambda s: [int(item) for item in s.split(',')])
     parser.add_argument('--device', default='auto')
     parser.add_argument('--max_capacity', type = int, default=10000) 
-    parser.add_argument('--n_channels', type=int, default=2)
+    parser.add_argument('--n_channels', type=int, default=7)
     parser.add_argument('--mode', type=str, default='channel_openning')#TODO: add this arg to all scripts
-    parser.add_argument('--capacity_upper_scale_bound', type=int, default=50)
+    parser.add_argument('--capacity_upper_scale_bound', type=int, default=25)
 
 
     args = parser.parse_args()

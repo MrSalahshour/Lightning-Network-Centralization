@@ -81,6 +81,7 @@ def load_data(mode, node, directed_edges_path, providers_path, local_size, manua
     
     subgraph_radius = 2
     data['providers'] = preprocessing.get_providers(providers_path)
+    data['n_channels'] = n_channels
     
     directed_edges = preprocessing.get_directed_edges(directed_edges_path)
     
@@ -152,16 +153,16 @@ def get_fee_based_on_strategy(state, strategy, directed_edges, node_index):
     return action, rescale
 
 def get_channels_and_capacities_based_on_strategy(state, strategy, directed_edges,capacity_upper_scale_bound,n_channels,n_nodes,
-                                                providers, src, trgs,channel_ids, local_size, manual_balance, initial_balances, capacities):
+                                                providers, src, trgs,channel_ids, local_size, manual_balance, initial_balances, capacities,graph_nodes):
     if strategy == 'random':
         action = get_random_channels_and_capacities(capacity_upper_scale_bound,n_channels,n_nodes)
     if strategy == 'top_k_betweenness':
-        action = get_top_k_betweenness(capacity_upper_scale_bound,n_channels,directed_edges, providers, src, trgs,channel_ids, local_size, manual_balance, initial_balances, capacities)
+        action = get_top_k_betweenness(capacity_upper_scale_bound,n_channels,directed_edges, providers, src, trgs,channel_ids, local_size, manual_balance, initial_balances, capacities,graph_nodes)
     #TODO: define basline strategy for random choose channels and capacities index.
 
     return action
 
-def get_top_k_betweenness(scale, n_channels, directed_edges, providers, src, trgs,channel_ids, local_size, manual_balance, initial_balances, capacities):
+def get_top_k_betweenness(scale, n_channels, directed_edges, providers, src, trgs,channel_ids, local_size, manual_balance, initial_balances, capacities,graph_nodes):
      _, _, _, sub_edges = preprocessing.create_sub_network(directed_edges, providers, src, trgs,
                                                                              channel_ids, local_size, manual_balance, initial_balances, capacities)
      G = nx.from_pandas_edgelist(sub_edges, source="src", target="trg",
@@ -171,6 +172,7 @@ def get_top_k_betweenness(scale, n_channels, directed_edges, providers, src, trg
      nodes_by_betweenness = nx.betweenness_centrality(G)
      sorted_by_betweenness = dict(sorted(nodes_by_betweenness.items(), key=lambda item: item[1]))
      top_k_betweenness = list(sorted_by_betweenness.keys())[-n_channels:]
+     top_k_betweenness = [graph_nodes.index(item) for item in top_k_betweenness if item in graph_nodes]
      top_k_capacity = list(sorted_by_betweenness.values())[-n_channels:]
      top_k_capacity = [round(scale*elem/sum(top_k_capacity)) for elem in top_k_capacity]
      
