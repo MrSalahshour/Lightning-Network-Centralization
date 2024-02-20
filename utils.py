@@ -161,14 +161,16 @@ def get_channels_and_capacities_based_on_strategy(strategy,capacity_upper_scale_
 
     return action
 
-def get_top_k_betweenness(scale, n_channels, src, graph_nodes, graph):
+def get_top_k_betweenness(scale, n_channels, src, graph_nodes, graph,alpha=0.1):
       
-     nodes_by_betweenness = nx.betweenness_centrality(graph).remove(src)
+     nodes_by_betweenness = nx.betweenness_centrality(graph)
+     if src in nodes_by_betweenness:
+         del nodes_by_betweenness[src]
      sorted_by_betweenness = dict(sorted(nodes_by_betweenness.items(), key=lambda item: item[1]))
      top_k_betweenness = list(sorted_by_betweenness.keys())[-n_channels:]
      top_k_betweenness = [graph_nodes.index(item) for item in top_k_betweenness if item in graph_nodes]
      top_k_capacity = list(sorted_by_betweenness.values())[-n_channels:]
-     top_k_capacity = [round(scale*elem/sum(top_k_capacity)) for elem in top_k_capacity]
+     top_k_capacity = [round(scale*elem+alpha*max(top_k_capacity)/(sum(top_k_capacity)+n_channels*alpha*max(top_k_betweenness))) for elem in top_k_capacity]
      
      return top_k_betweenness + top_k_capacity
      

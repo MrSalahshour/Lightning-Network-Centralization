@@ -341,8 +341,8 @@ class FeeEnv(gym.Env):
             
 
 
-    def get_local_graph(self,amount):
-        return self.simulator.get_local_graph(amount)
+    def get_local_graph(self,scale):
+        return self.simulator.get_local_graph(scale)
 
 
 """action space: normalise ->  [2,4,5] -> [4,16,32] -> sum = 52 - > [2,8,16] -> [10,40,80]

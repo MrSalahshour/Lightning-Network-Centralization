@@ -23,7 +23,7 @@ def evaluate(mode,strategy, env, env_params, gamma):
             else: graph=None
             #NOTE: should define a evaluation functions here to use as balinese evaluation for channel selection fee.
             action = get_channels_and_capacities_based_on_strategy(strategy,env_params['capacity_upper_scale_bound']
-                                                                   ,env_params['n_channels'],env_params['local_size'], data["src"],env.graph_nodes,graph)
+                                                                   ,env_params['n_channels'],env_params['local_size'], env.src,env.graph_nodes,graph)
             print("ACTION",action)
             state, reward, done, info = env.step(action)
         rewards.append(reward)

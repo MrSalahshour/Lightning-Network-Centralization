@@ -203,14 +203,15 @@ class simulator():
     return cumulative_budget
 
 
-  def get_local_graph(self, amount):
-    self.sync_network_dictionary()
+  def get_local_graph(self, scale):
+    # self.sync_network_dictionary()
     graph = nx.DiGraph()
     for key in self.network_dictionary :
       val = self.network_dictionary[key]
       # val[0] represents balance key[0] src and key[1] target, val[1] is fee_base and val[2] is fee_rate
-      graph.add_edge(key[0],key[1],weight = val[1]*amount + val[2])
+      graph.add_edge(key[0],key[1],weight = val[1]*scale + val[2])
     
+    assert self.src in self.network_dictionary
     return graph
     
 
