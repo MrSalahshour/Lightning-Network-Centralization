@@ -52,7 +52,7 @@ def make_env(data, env_params, seed):
     return env
 
 #TODO: #14 #13 mode to be set
-def load_data(mode, node, directed_edges_path, providers_path, local_size, manual_balance, initial_balances, capacities, n_channels):
+def load_data(mode, node, directed_edges_path, providers_path, local_size, manual_balance, initial_balances, capacities, n_channels,local_heads_number):
     """
     :return:
     data = dict{mode: Levin is used for different modes: fee_selection, channel_openning (default: String)
@@ -107,7 +107,7 @@ def load_data(mode, node, directed_edges_path, providers_path, local_size, manua
                                                            data['channel_ids'],
                                                            channels,
                                                            local_size,
-                                                           manual_balance, initial_balances, capacities,mode)
+                                                           manual_balance, initial_balances, capacities,mode,local_heads_number)
     return data
 
 
@@ -170,7 +170,7 @@ def get_top_k_betweenness(scale, n_channels, src, graph_nodes, graph,alpha=0.1):
      top_k_betweenness = list(sorted_by_betweenness.keys())[-n_channels:]
      top_k_betweenness = [graph_nodes.index(item) for item in top_k_betweenness if item in graph_nodes]
      top_k_capacity = list(sorted_by_betweenness.values())[-n_channels:]
-     top_k_capacity = [round(scale*elem+alpha*max(top_k_capacity)/(sum(top_k_capacity)+n_channels*alpha*max(top_k_betweenness))) for elem in top_k_capacity]
+     top_k_capacity = [round(scale*(elem+alpha*max(top_k_capacity))/(sum(top_k_capacity)+n_channels*alpha*max(top_k_capacity))) for elem in top_k_capacity]
      
      return top_k_betweenness + top_k_capacity
      

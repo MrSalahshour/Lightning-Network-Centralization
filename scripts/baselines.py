@@ -62,6 +62,8 @@ if __name__ == '__main__':
     parser.add_argument('--n_channels', type=int, default=7)
     parser.add_argument('--mode', type=str, default='channel_openning')#TODO: add this arg to all scripts
     parser.add_argument('--capacity_upper_scale_bound', type=int, default=25)
+    parser.add_argument('--local_heads_number', type=int, default=5)
+
 
 
     args = parser.parse_args()
@@ -82,7 +84,8 @@ if __name__ == '__main__':
                   'capacities': args.capacities,
                   'max_capacity': args.max_capacity,
                   'n_channels': args.n_channels,
-                  'capacity_upper_scale_bound': args.capacity_upper_scale_bound}
+                  'capacity_upper_scale_bound': args.capacity_upper_scale_bound,
+                  'local_heads_number':args.local_heads_number}
 
 
     strategy = args.strategy
@@ -93,7 +96,7 @@ if __name__ == '__main__':
         # data = load_data(env_params['node_index'], env_params['data_path'], env_params['merchants_path'], env_params['local_size'],
         #                  env_params['manual_balance'], env_params['initial_balances'], env_params['capacities'])
         data = load_data(env_params['mode'],env_params['node_index'], env_params['data_path'], env_params['merchants_path'], env_params['local_size'],
-                     env_params['manual_balance'], env_params['initial_balances'], env_params['capacities'],env_params['n_channels'])
+                     env_params['manual_balance'], env_params['initial_balances'], env_params['capacities'],env_params['n_channels'],env_params['local_heads_number'])
         env = make_env(data, env_params, seed)
         discounted_reward = evaluate(env_params['mode'],strategy, env, env_params, gamma=0.99)
         reward_list.append(discounted_reward)

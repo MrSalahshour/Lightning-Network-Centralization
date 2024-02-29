@@ -19,8 +19,7 @@ def aggregate_edges(directed_edges):
     }).reset_index()
     return directed_aggr_edges
 
-
-
+    
 def get_neighbors(G, src, local_size):
     """localising the network around the node"""
 
@@ -104,8 +103,8 @@ def create_active_channels(network_dictionary, channels):
         active_channels[(trg, src)] = network_dictionary[(trg, src)]
     return active_channels
 
-
-def create_sub_network(directed_edges, providers, src, trgs, channel_ids, local_size, manual_balance=False, initial_balances = [], capacities=[]):
+#TODO: add env param local....
+def create_sub_network(directed_edges, providers, src, trgs, channel_ids, local_size, manual_balance=False, initial_balances = [], capacities=[], local_heads_number=5):
     """creating network_dictionary, edges and providers for the local subgraph."""
     edges = initiate_balances(directed_edges)
     if manual_balance:
@@ -116,8 +115,16 @@ def create_sub_network(directed_edges, providers, src, trgs, channel_ids, local_
     if len(trgs)==0:
         print("No trgs found")
         #NOTE: in CHANNEL OPENNING case, instead of src, a provider is given for generating the local subgraph
+        
         G.add_node(src)
-        sub_nodes = get_neighbors(G, get_random_provider(providers), local_size)
+        sub_nodes = set()
+        
+        random_providers = get_random_provider(providers, local_heads_number)
+        for provider in random_providers:
+            sub_nodes_temp = get_neighbors(G, provider, local_size)
+            sub_nodes.update(sub_nodes_temp)
+            
+        sub_nodes = set(random.sample(sub_nodes, local_size))
         sub_nodes.add(src)
     else:
         sub_nodes = get_neighbors(G, src, local_size)
@@ -179,7 +186,7 @@ def create_node(directed_edges, src, number_of_channels):
     
 
 
-def get_init_parameters(providers, directed_edges, src, trgs, channel_ids, channels, local_size, manual_balance, initial_balances,capacities,mode):
+def get_init_parameters(providers, directed_edges, src, trgs, channel_ids, channels, local_size, manual_balance, initial_balances,capacities,mode, local_heads_number):
     #get fee_base and fee_rate median for each node
     fee_policy_dict = dict()
     grouped = directed_edges.groupby(["src"])
@@ -194,7 +201,7 @@ def get_init_parameters(providers, directed_edges, src, trgs, channel_ids, chann
      
     
     network_dictionary, nodes, sub_providers, sub_edges = create_sub_network(directed_edges, providers, src, trgs,
-                                                                             channel_ids, local_size, manual_balance, initial_balances, capacities)
+                                                                             channel_ids, local_size, manual_balance, initial_balances, capacities, local_heads_number)
     active_channels = create_active_channels(network_dictionary, channels)
 
     try:
@@ -216,8 +223,9 @@ def generate_transaction_types(number_of_transaction_types, counts, amounts, eps
     for i in range(number_of_transaction_types):
         transaction_types.append((counts[i], amounts[i], epsilons[i]))
     return transaction_types
-def get_random_provider(providers):
+
+def get_random_provider(providers, number_of_heads):
     random.seed(42)
-    return random.choice(providers)
+    return random.sample(providers, number_of_heads)
     
     
