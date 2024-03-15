@@ -3,6 +3,7 @@ import pandas as pd
 import json
 import numpy as np
 import random
+from operator import itemgetter
 
 
 def aggregate_edges(directed_edges):
@@ -37,6 +38,29 @@ def get_neighbors(G, src, local_size):
                   return set(neighbors)
                if v not in neighbor:
                   neighbors.append(v)
+
+def bfs_k_levels(G, src, k):
+    """Localize the network around the node up to k levels using BFS"""
+
+    # Initialize a set to store the nodes visited
+    neighbors = set([src])
+
+    # Initialize a queue for BFS
+    queue = [(src, 0)]
+
+    while queue:
+        node, level = queue.pop(0)
+
+        if level == k:
+            break
+
+        for neighbor in G.neighbors(node):
+            if neighbor not in neighbors:
+                neighbors.add(neighbor)
+                queue.append((neighbor, level + 1))
+
+    print('Number of nodes in k-level BFS: ', len(neighbors))
+    return neighbors
 
 
 def initiate_balances(directed_edges, approach='half'):
@@ -115,17 +139,41 @@ def create_sub_network(directed_edges, providers, src, trgs, channel_ids, local_
     if len(trgs)==0:
         print("No trgs found")
         #NOTE: in CHANNEL OPENNING case, instead of src, a provider is given for generating the local subgraph
-        
+        mode_sample = 'degree' #DEFINE WHICH SAMPLING METHOD DO YOU WANT
         G.add_node(src)
         sub_nodes = set()
-        
-        random_providers = get_random_provider(providers, local_heads_number)
-        for provider in random_providers:
-            sub_nodes_temp = get_neighbors(G, provider, local_size)
-            sub_nodes.update(sub_nodes_temp)
+
+        if mode_sample == 'degree':
+            random_base_nodes = get_base_nodes_by_degree(G,local_heads_number)
+            for random_base_node in random_base_nodes:
+                sub_nodes_temp = get_neighbors(G, random_base_node, local_size)
+                sub_nodes.update(sub_nodes_temp)
+
+        if mode_sample == 'betweenness':
+            random_base_nodes = get_base_nodes_by_betweenness_centrality(G,local_heads_number)
+            for random_base_node in random_base_nodes:
+                sub_nodes_temp = get_neighbors(G, random_base_node, local_size)
+                sub_nodes.update(sub_nodes_temp)
+
+
+        if mode_sample == 'provider':
+            random_providers = get_random_provider(providers, local_heads_number)
+            for provider in random_providers:
+                sub_nodes_temp = get_neighbors(G, provider, local_size)
+                sub_nodes.update(sub_nodes_temp)
             
-        sub_nodes = set(random.sample(sub_nodes, local_size))
+        # sub_nodes = set(random.sample(sub_nodes, local_size))
         sub_nodes.add(src)
+        #Check whether the sub nodes we choose for localization is connected or not
+        if is_subgraph_weakly_connected(G, sub_nodes):
+            print("The subgraph is weakly connected.")
+        else:
+            print("The subgraph is not weakly connected.")
+
+        if is_subgraph_strongly_connected(G, sub_nodes):
+            print("The subgraph is strongly connected.")
+        else:
+            print("The subgraph is not strongly connected.")
     else:
         sub_nodes = get_neighbors(G, src, local_size)
         
@@ -227,5 +275,71 @@ def generate_transaction_types(number_of_transaction_types, counts, amounts, eps
 def get_random_provider(providers, number_of_heads):
     random.seed(42)
     return random.sample(providers, number_of_heads)
+
+def get_base_nodes_by_degree(G,number_of_heads):
+    random.seed(42)
+    top_k_degree_nodes = top_k_nodes(G, number_of_heads)
+    return random.sample(top_k_degree_nodes, number_of_heads)
+
+def get_base_nodes_by_betweenness_centrality(G,number_of_heads):
+    random.seed(42)
+    top_k_betweenness_centrality_nodes = top_k_nodes_betweenness(G, number_of_heads)
+    return random.sample(top_k_betweenness_centrality_nodes, number_of_heads)
+
+def top_k_nodes(G, k):
+    # Compute the degree of each node
+    node_degrees = G.degree()
     
+    # Sort nodes by degree
+    sorted_nodes = sorted(node_degrees, key=itemgetter(1), reverse=True)
+    
+    # Get the top k nodes
+    top_k = sorted_nodes[:k]
+    
+    # Return only the nodes, not their degrees
+    return [node for node, degree in top_k]
+
+
+def top_k_nodes_betweenness(G, k):
+    # Compute the betweenness centrality of each node
+    node_betweenness = nx.betweenness_centrality(G)
+    
+    # Sort nodes by betweenness centrality
+    sorted_nodes = sorted(node_betweenness.items(), key=itemgetter(1), reverse=True)
+    
+    # Get the top k nodes
+    top_k = sorted_nodes[:k]
+    
+    # Return only the nodes, not their betweenness centrality
+    return [node for node, centrality in top_k]
+
+def is_subgraph_weakly_connected(G, nodes):
+    """
+    Check if the subgraph induced by 'nodes' in directed graph 'G' is weakly connected.
+
+    Parameters:
+    G (networkx.DiGraph): The main directed graph.
+    nodes (list): The nodes of the subgraph.
+
+    Returns:
+    bool: True if the subgraph is weakly connected, False otherwise.
+    """
+    H = G.subgraph(nodes)
+    return nx.is_weakly_connected(H)
+
+def is_subgraph_strongly_connected(G, nodes):
+    """
+    Check if the subgraph induced by 'nodes' in directed graph 'G' is strongly connected.
+
+    Parameters:
+    G (networkx.DiGraph): The main directed graph.
+    nodes (list): The nodes of the subgraph.
+
+    Returns:
+    bool: True if the subgraph is strongly connected, False otherwise.
+    """
+    H = G.subgraph(nodes)
+    return nx.is_strongly_connected(H)
+
+
     
