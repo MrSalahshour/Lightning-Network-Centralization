@@ -3,14 +3,42 @@ from stable_baselines3 import SAC, TD3, PPO
 from numpy import load
 import gym
 import numpy as np
+from stable_baselines3.common.callbacks import BaseCallback
 
+
+class EarlyStoppingCallback(BaseCallback):
+    def __init__(self, check_freq: int, n_steps_without_progress: int, verbose=0):
+        super(EarlyStoppingCallback, self).__init__(verbose)
+        self.check_freq = check_freq
+        self.n_steps_without_progress = n_steps_without_progress
+        self.best_reward = -np.inf
+        self.n_steps_since_best_reward = 0
+
+    def _on_step(self) -> bool:
+        if self.n_calls % self.check_freq == 0:
+            # Get the current reward estimate
+            x, y = self.model.ep_info_buffer.get()
+            if y > self.best_reward:
+                self.best_reward = y
+                self.n_steps_since_best_reward = 0
+            else:
+                self.n_steps_since_best_reward += 1
+
+            if self.n_steps_since_best_reward > self.n_steps_without_progress:
+                print("Stopping training because the reward has not improved for {} steps.".format(self.n_steps_without_progress))
+                return False
+        return True
 
 def train(env_params, train_params, tb_log_dir, tb_name, log_dir, seed):
     data = load_data(env_params['mode'],env_params['node_index'], env_params['data_path'], env_params['merchants_path'], env_params['local_size'],
                      env_params['manual_balance'], env_params['initial_balances'], env_params['capacities'],env_params['n_channels'],env_params['local_heads_number'])
     env = make_env(data, env_params, seed)
     model = make_agent(env, train_params['algo'], train_params['device'], tb_log_dir)
-    model.learn(total_timesteps=train_params['total_timesteps'], tb_log_name=tb_name)
+    #Add Callback for early stopping
+    callback = EarlyStoppingCallback(check_freq=1000, n_steps_without_progress=10000)
+    model.learn(total_timesteps=train_params['total_timesteps'], tb_log_name=tb_name, callback=callback)
+
+    # model.learn(total_timesteps=train_params['total_timesteps'], tb_log_name=tb_name)
     model.save(log_dir+tb_name)
 
 
