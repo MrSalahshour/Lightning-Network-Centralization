@@ -63,6 +63,44 @@ def bfs_k_levels(G, src, k):
     return neighbors
 
 
+def snowball_sampling(G, initial_vertices, stages, k):
+    """
+    Perform snowball sampling on a graph G.
+
+    Parameters:
+        G (networkx.Graph): The graph to sample from.
+        initial_vertices (list): Initial set of vertices V(0).
+        stages (int): Number of stages for the sampling process.
+        k (int): Number of neighboring nodes to query at each stage.
+
+    Returns:
+        set: Set of sampled vertices.
+    """
+    Union_set = set(initial_vertices)
+    sampled_vertices = set(initial_vertices)
+    
+    for i in range(1, stages + 1):
+        new_vertices = set()
+
+        for vertex in sampled_vertices:
+            neighbors = get_snowball_neighbors(G, vertex, k)
+            new_vertices.update(neighbors)
+        
+        sampled_vertices = new_vertices.difference(Union_set)
+        Union_set.update(new_vertices)
+
+    return Union_set
+
+def get_snowball_neighbors(G, vertex, k):
+    
+    """localising the network around the node"""
+
+    neighbors = list(G.neighbors(vertex))
+    sampled_neighbors = random.sample(neighbors, min(k, len(neighbors)))
+    
+    return set(sampled_neighbors)
+    
+
 def initiate_balances(directed_edges, approach='half'):
     '''
     approach = 'random'
@@ -143,24 +181,27 @@ def create_sub_network(directed_edges, providers, src, trgs, channel_ids, local_
         G.add_node(src)
         sub_nodes = set()
 
+        #NOTE: The following were replaced with weighted random sampling
         if mode_sample == 'degree':
-            random_base_nodes = get_base_nodes_by_degree(G,local_heads_number)
-            for random_base_node in random_base_nodes:
-                sub_nodes_temp = get_neighbors(G, random_base_node, local_size)
-                sub_nodes.update(sub_nodes_temp)
+            # random_base_nodes = get_base_nodes_by_degree(G,local_heads_number)
+            random_base_nodes =  random_k_nodes_weighted(G, local_heads_number)
 
         if mode_sample == 'betweenness':
-            random_base_nodes = get_base_nodes_by_betweenness_centrality(G,local_heads_number)
-            for random_base_node in random_base_nodes:
-                sub_nodes_temp = get_neighbors(G, random_base_node, local_size)
-                sub_nodes.update(sub_nodes_temp)
-
+            # random_base_nodes = get_base_nodes_by_betweenness_centrality(G,local_heads_number)
+            random_base_nodes =  random_k_nodes_betweenness_weighted(G, local_heads_number)
 
         if mode_sample == 'provider':
-            random_providers = get_random_provider(providers, local_heads_number)
-            for provider in random_providers:
-                sub_nodes_temp = get_neighbors(G, provider, local_size)
-                sub_nodes.update(sub_nodes_temp)
+            random_base_nodes = get_random_provider(providers, local_heads_number)
+        
+        #NOTE:the following is the previous sampling code
+        # for random_base_node in random_base_nodes:
+        #         sub_nodes_temp = get_neighbors(G, random_base_node, local_size)
+        #         sub_nodes.update(sub_nodes_temp)
+        
+        #NOTE: the following refers to snowball sampling with choice function being uniform random
+        sub_nodes.update(snowball_sampling(G,random_base_nodes,stages=4,k=4))
+        print("subgraph created with size: ",len(sub_nodes)+1)
+        
             
         # sub_nodes = set(random.sample(sub_nodes, local_size))
         sub_nodes.add(src)
@@ -279,12 +320,12 @@ def get_random_provider(providers, number_of_heads):
 def get_base_nodes_by_degree(G,number_of_heads):
     random.seed(42)
     top_k_degree_nodes = top_k_nodes(G, number_of_heads)
-    return random.sample(top_k_degree_nodes, number_of_heads)
+    return top_k_degree_nodes
 
 def get_base_nodes_by_betweenness_centrality(G,number_of_heads):
     random.seed(42)
     top_k_betweenness_centrality_nodes = top_k_nodes_betweenness(G, number_of_heads)
-    return random.sample(top_k_betweenness_centrality_nodes, number_of_heads)
+    return top_k_betweenness_centrality_nodes
 
 def top_k_nodes(G, k):
     # Compute the degree of each node
@@ -299,6 +340,31 @@ def top_k_nodes(G, k):
     # Return only the nodes, not their degrees
     return [node for node, degree in top_k]
 
+def random_k_nodes_weighted(G, k):
+    # Compute the degree of each node
+    node_degrees = dict(G.degree())
+
+    # Compute weights based on node degrees
+    total_degree = sum(node_degrees.values())
+    weights = {node: degree / total_degree for node, degree in node_degrees.items()}
+
+    # Sample k nodes with weighted randomness
+    sampled_nodes = random.choices(list(weights.keys()), weights=list(weights.values()), k=k)
+
+    return sampled_nodes
+
+def random_k_nodes_betweenness_weighted(G, k):
+    # Compute the betweenness centrality of each node
+    node_betweenness = nx.betweenness_centrality(G)
+
+    # Compute weights based on betweenness centrality
+    total_betweenness = sum(node_betweenness.values())
+    weights = {node: centrality / total_betweenness for node, centrality in node_betweenness.items()}
+
+    # Sample k nodes with weighted randomness
+    sampled_nodes = random.choices(list(weights.keys()), weights=list(weights.values()), k=k)
+
+    return sampled_nodes
 
 def top_k_nodes_betweenness(G, k):
     # Compute the betweenness centrality of each node
