@@ -85,9 +85,15 @@ def snowball_sampling(G, initial_vertices, stages, k):
         for vertex in sampled_vertices:
             neighbors = get_snowball_neighbors(G, vertex, k)
             new_vertices.update(neighbors)
-        
-        sampled_vertices = new_vertices.difference(Union_set)
-        Union_set.update(new_vertices)
+        if len(Union_set)>= 188:
+            break
+        else:
+            sampled_vertices = new_vertices.difference(Union_set)
+            if len(Union_set) + len(sampled_vertices)>188:
+                print("Cutting over 188")
+                Union_set.update(set(random.sample(list(sampled_vertices), 188 - len(Union_set))))
+                break
+            Union_set.update(new_vertices)
 
     return Union_set
 
@@ -187,8 +193,8 @@ def create_sub_network(directed_edges, providers, src, trgs, channel_ids, local_
             random_base_nodes =  random_k_nodes_weighted(G, local_heads_number)
 
         if mode_sample == 'betweenness':
-            # random_base_nodes = get_base_nodes_by_betweenness_centrality(G,local_heads_number)
-            random_base_nodes =  random_k_nodes_betweenness_weighted(G, local_heads_number)
+            random_base_nodes = get_base_nodes_by_betweenness_centrality(G,local_heads_number)
+            # random_base_nodes =  random_k_nodes_betweenness_weighted(G, local_heads_number)
 
         if mode_sample == 'provider':
             random_base_nodes = get_random_provider(providers, local_heads_number)
@@ -201,10 +207,11 @@ def create_sub_network(directed_edges, providers, src, trgs, channel_ids, local_
         #NOTE: the following refers to snowball sampling with choice function being uniform random
         sub_nodes.update(snowball_sampling(G,random_base_nodes,stages=4,k=4))
         print("subgraph created with size: ",len(sub_nodes)+1)
+
         
             
-        # sub_nodes = set(random.sample(sub_nodes, local_size))
-        sub_nodes.add(src)
+        # sub_nodes = set(random.sample(list(sub_nodes), local_size))
+
         #Check whether the sub nodes we choose for localization is connected or not
         if is_subgraph_weakly_connected(G, sub_nodes):
             print("The subgraph is weakly connected.")
@@ -215,6 +222,12 @@ def create_sub_network(directed_edges, providers, src, trgs, channel_ids, local_
             print("The subgraph is strongly connected.")
         else:
             print("The subgraph is not strongly connected.")
+        print("lengths of components: ", [len(comp) for comp in components(G, sub_nodes)])
+
+        
+        sub_nodes.add(src)
+        
+        
     else:
         sub_nodes = get_neighbors(G, src, local_size)
         
@@ -227,6 +240,11 @@ def create_sub_network(directed_edges, providers, src, trgs, channel_ids, local_
     # network_dictionary = {(src,trg):[balance,alpha,beta,capacity]}
 
     return network_dictionary, sub_nodes, sub_providers, sub_edges
+
+def components(G, nodes):
+   
+    H = G.subgraph(nodes)
+    return nx.strongly_connected_components(H)
 
 
 def init_node_params(edges, providers, verbose=True):
@@ -406,6 +424,3 @@ def is_subgraph_strongly_connected(G, nodes):
     """
     H = G.subgraph(nodes)
     return nx.is_strongly_connected(H)
-
-
-    
