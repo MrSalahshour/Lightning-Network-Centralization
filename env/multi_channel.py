@@ -3,10 +3,11 @@ from gym import spaces
 from gym.spaces import *
 from gym.utils import seeding
 import numpy as np
-
+import graph_embedding_processing
+import preprocessing
 from simulator.simulator import simulator
 from simulator.preprocessing import generate_transaction_types
-
+import random
 from scipy.special import softmax
 
 #TODO: #12 self.mode
@@ -56,19 +57,26 @@ class FeeEnv(gym.Env):
     We are adding the income from each payment to the balance of the corresponding channel.
     """
 
-    def __init__(self, mode, data, max_capacity, fee_base_upper_bound, max_episode_length, number_of_transaction_types, counts, amounts, epsilons,capacity_upper_scale_bound, seed):
+    def __init__(self, mode, data, max_capacity, fee_base_upper_bound, max_episode_length, number_of_transaction_types, counts, amounts, epsilons, capacity_upper_scale_bound, seed, list_of_sub_nodes, LN_graph):
         # Source node
-        self.src = data['src'] 
+        self.list_of_sub_nodes = list_of_sub_nodes
+        self.LN_graph = LN_graph
+        self.data = data
         self.prev_action = []
+        self.providers = data['providers']
+        self.src = self.data['src'] 
+        self.transaction_types = generate_transaction_types(number_of_transaction_types, counts, amounts,
+                                                       epsilons)
+        new_graph = self.set_new_graph_environment()
         # self.prev_violation = False
         #NOTE: added attribute
-        self.n_nodes = len(data['nodes']) - 1 # nodes should be minus one to doesn't include our node
-        self.graph_nodes = list(data['nodes'])
-        self.graph_nodes.remove(data['src'])
+        self.n_nodes = len(self.data['nodes']) - 1 # nodes should be minus one to doesn't include our node
+        # self.graph_nodes = list(self.data['nodes'])
+        # self.graph_nodes.remove(self.src)
         print("Nodes: ",self.n_nodes)
         self.mode = mode
-        self.trgs = data['trgs']
-        self.n_channel = data['n_channels']
+        self.embedding_mode = "Graph2Vec"
+        self.embedding_size = 128
         print('action dim:', self.n_nodes)
         
 
@@ -89,8 +97,6 @@ class FeeEnv(gym.Env):
         #NOTE: the following line is the total budget for the model to utilize in CHANNEL_OPENNING mode
         self.maximum_capacity = max_capacity
         #TODO #8:
-        # self.capacities = [50000, 100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000,
-        #                         1000000, 2000000, 3000000, 4000000, 5000000, 6000000, 7000000, 8000000, 9000000, 10000000] 
 
         # self.action_space = spaces.MultiDiscrete([self.n_nodes for _ in range(self.n_channel)] + [len(self.capacities) for _ in range(self.n_channel)])
         # self.action_space = Box(low = 0, high = max_capacity, shape=(self.n_nodes,), dtype=np.float32)
@@ -104,11 +110,18 @@ class FeeEnv(gym.Env):
         #Please note that the dimensions for balance and transaction amounts start from n_nodes and n_nodes + n_channels respectively. This allows us to separate the node connection information from the channel balance and transaction amounts.
 
         # self.max_balance = 100
-        self.max_transaction_amount = 1000
-        self.budget_scaling_constant = 1
+        # self.max_transaction_amount = 1000
+        # self.budget_scaling_constant = 1
 
         # self.observation_space = MultiDiscrete([2] * (self.n_nodes) + [self.max_balance + 1] * (self.n_nodes) + [self.max_transaction_amount + 1] * (self.n_nodes))
-        self.observation_space = MultiDiscrete([2] * (self.n_nodes) + [self.maximum_capacity/self.budget_scaling_constant] * (self.n_nodes) + [self.max_transaction_amount + 1] * (self.n_nodes))
+        # self.observation_space = MultiDiscrete([2] * (self.n_nodes) + [self.maximum_capacity/self.budget_scaling_constant] * (self.n_nodes) + [self.max_transaction_amount + 1] * (self.n_nodes))
+
+        
+        self.observation_space = Dict({
+            'capacities': Box(low=0, high=max_capacity, shape=(self.n_nodes,)),
+            'transaction_amounts': Box(low=0, high=np.inf, shape=(self.n_nodes,)),
+            'graph_embedding': Box(low=-np.inf, high=np.inf, shape=(self.embedding_size,))
+        })
 
         # Initial values of each channel for fee selection mode
         # self.initial_balances = data['initial_balances']
@@ -116,7 +129,15 @@ class FeeEnv(gym.Env):
         # self.state = np.append(self.initial_balances, np.zeros(shape=(self.n_channel,)))
         
         #
-        self.state = np.concatenate((np.zeros(shape=(self.n_nodes,)), np.zeros(shape=(self.n_nodes)),np.zeros(shape=(self.n_nodes))))
+        # self.state = np.concatenate((np.zeros(shape=(self.n_nodes,)), np.zeros(shape=(self.n_nodes)),np.zeros(shape=(self.n_nodes))))
+
+        graph_embedding =self.get_new_graph_embedding(new_graph,self.embedding_mode)
+
+        self.state = {
+            'capacities': np.zeros(self.n_nodes),
+            'transaction_amounts': np.zeros(self.n_nodes),
+            'graph_embedding': graph_embedding
+        }
             
         self.time_step = 0
         self.max_episode_length = max_episode_length
@@ -124,20 +145,19 @@ class FeeEnv(gym.Env):
         # self.balance_ratio = 0.1
 
         # Simulator
-        transaction_types = generate_transaction_types(number_of_transaction_types, counts, amounts,
-                                                       epsilons)
-        self.simulator = simulator(mode=self.mode,
-                                   src=data['src'],
-                                   trgs=data['trgs'],
-                                   channel_ids=data['channel_ids'],
-                                   active_channels=data['active_channels'],
-                                   network_dictionary=data['network_dictionary'],
-                                   merchants=data['providers'],
-                                   transaction_types=transaction_types,
-                                   node_variables=data['node_variables'],
-                                   active_providers=data['active_providers'],
-                                   fee_policy = data["fee_policy"],
-                                   fixed_transactions=False)
+        
+        # self.simulator = simulator(mode=self.mode,
+        #                            src=self.src,
+        #                            trgs=self.data['trgs'],
+        #                            channel_ids=self.data['channel_ids'],
+        #                            active_channels=self.data['active_channels'],
+        #                            network_dictionary=self.data['network_dictionary'],
+        #                            merchants=self.providers,
+        #                            transaction_types=self.transaction_types,
+        #                            node_variables=self.data['node_variables'],
+        #                            active_providers=self.data['active_providers'],
+        #                            fee_policy = self.data["fee_policy"],
+        #                            fixed_transactions=False)
 
         self.seed(seed)
 
@@ -200,6 +220,9 @@ class FeeEnv(gym.Env):
 
         
         if self.mode == "channel_openning":
+            #TODO: calculate how many channels deleted for penalty in the reward.
+            if len(self.prev_action)!=0:
+                channel_deletion_penalty = self.calculate_penalty(self.prev_action,action)
             self.prev_action = action
     
             #TODO: #11 set reasonable fees
@@ -212,16 +235,9 @@ class FeeEnv(gym.Env):
             balances, transaction_amounts, transaction_numbers = self.simulate_transactions(fees,additive_channels,ommitive_channels)
             
             fees = fees[::2]
-            # if self.maximum_capacity+additive_budget<0:
-            #     reward = -0.01
-            #     #NOTE: how to detemine this value of reward for violating(-inf cause infinite episode avg mean which is not okay and cause problems)
-            #     violation = True
 
-            # else:
-                #updating the available budget
-                # self.maximum_capacity += additive_budget
-            reward = np.sum(np.multiply(fees[0:self.n_channel], transaction_amounts) + \
-                    np.multiply(fees[self.n_channel:], transaction_numbers))
+            reward = np.sum(np.multiply(fees[0:self.n_channel], transaction_numbers ) + \
+                    np.multiply(fees[self.n_channel:], transaction_amounts)) - channel_deletion_penalty
         else:
             balances, transaction_amounts, transaction_numbers = self.simulate_transactions(action)
             reward = 1e-6 * np.sum(np.multiply(action[0:self.n_channel], transaction_amounts) + \
@@ -240,13 +256,13 @@ class FeeEnv(gym.Env):
         # if self.prev_violation == True:
         #     done = True
         
-        connected_nodes = np.zeros((self.n_nodes,))
+        # connected_nodes = np.zeros((self.n_nodes,))
         capacities_list = np.zeros((self.n_nodes,))
         # balances_list = np.zeros((self.n_nodes,))
         transaction_amounts_list = np.zeros((self.n_nodes,))
         # if violation == False: 
         for idx in range (len(action_idx[:midpoint])):
-            connected_nodes[action_idx[idx]] = 1
+            # connected_nodes[action_idx[idx]] = 1
             # balances_list[action_idx[idx]] = balances[idx]
             capacities_list[action_idx[idx]] = action[idx+midpoint]
             transaction_amounts_list[action_idx[idx]] = transaction_amounts[idx]
@@ -259,7 +275,12 @@ class FeeEnv(gym.Env):
             self.state = np.append(balances, transaction_amounts)/1000
         else:
             #changed from balanced-based to capacity-based
-            self.state = np.concatenate((connected_nodes, (capacities_list)/1000, (transaction_amounts_list)/1000))
+            # self.state = np.concatenate((connected_nodes, (capacities_list)/1000, (transaction_amounts_list)/1000))
+            self.state = {
+                'capacities': capacities_list,
+                'transaction_amounts': transaction_amounts_list,
+                'graph_embedding': np.zeros(self.embedding_size)
+            }
 
         return self.state, reward, done, info
 
@@ -282,8 +303,17 @@ class FeeEnv(gym.Env):
             return np.array(self.state, dtype=np.float64)
         
         else:
-            self.state = np.concatenate((np.zeros(shape=(self.n_nodes,)), np.zeros(shape=(self.n_nodes)),np.zeros(shape=(self.n_nodes))))
-            return self.state
+            # self.state = np.concatenate((np.zeros(shape=(self.n_nodes,)), np.zeros(shape=(self.n_nodes)),np.zeros(shape=(self.n_nodes))))
+            self.prev_action = []
+            new_graph = self.set_new_graph_environment()
+            new_embedding = self.get_new_graph_embedding(new_graph,self.embedding_mode)
+            self.state = {
+                'capacities': np.zeros(self.n_nodes),
+                'transaction_amounts': np.zeros(self.n_nodes),
+                'graph_embedding': new_embedding #sample new embedding
+            }
+            return self.state 
+            
             
         
     
@@ -343,6 +373,86 @@ class FeeEnv(gym.Env):
 
     def get_local_graph(self,scale):
         return self.simulator.get_local_graph(scale)
+    
+
+    def sample_graph_environment(self):
+        sub_node = random.choice(self.list_of_sub_nodes)
+        return sub_node
+    
+    def get_new_graph_embedding(self, G, embedding_mode):
+
+        if embedding_mode == 'feather':
+            return graph_embedding_processing.get_feather_embedding(G)
+        
+        elif embedding_mode == 'geo_scattering':
+            return graph_embedding_processing.get_geo_scattering_embedding(G)
+
+        elif embedding_mode == 'LDP':
+            return graph_embedding_processing.get_LDP_embedding(G)
+        
+        elif embedding_mode == 'GL2Vec':
+            return graph_embedding_processing.get_GL2Vec_embedding(G)
+
+        elif embedding_mode == 'Graph2Vec':
+            return graph_embedding_processing.get_Graph2Vec_embedding(G)
+
+        else:
+            print("Unknown embedding mode")
+        
+        return None
+    
+    def set_new_graph_environment(self):
+
+        sub_nodes = self.sample_graph_environment()
+        network_dictionary, sub_providers, sub_edges, sub_graph = preprocessing.get_sub_graph_properties(self.LN_graph,sub_nodes,self.providers)
+        active_channels = preprocessing.create_active_channels(network_dictionary, [])
+
+        try:
+            node_variables, active_providers, _ = preprocessing.init_node_params(sub_edges, sub_providers, verbose=True)
+        except:
+            node_variables, active_providers = None
+            
+
+
+        self.data['active_channels'] = active_channels
+        self.data['network_dictionary'] = network_dictionary
+        self.data['node_variables'] = node_variables
+        self.data['active_providers'] = active_providers
+        self.data['nodes'] = sub_nodes
+
+        self.graph_nodes = list(self.data['nodes'])
+        self.graph_nodes.remove(self.src)
+
+
+
+        self.simulator = simulator(mode=self.mode,
+                                   src=self.src,
+                                   trgs=self.data['trgs'],
+                                   channel_ids=self.data['channel_ids'],
+                                   active_channels=self.data['active_channels'],
+                                   network_dictionary=self.data['network_dictionary'],
+                                   merchants=self.providers,
+                                   transaction_types=self.transaction_types,
+                                   node_variables=self.data['node_variables'],
+                                   active_providers=self.data['active_providers'],
+                                   fee_policy = self.data["fee_policy"],
+                                   fixed_transactions=False)
+        
+        return sub_graph
+    # one channel distruction would cost 10^7 msat
+    def calculate_penalty(self,prev_action,action,channel_distruction_penalty = 10000):
+        set1 = set(prev_action)
+        set2 = set(action)
+
+        diff_items = set1.symmetric_difference(set2)
+
+        return len(diff_items) * channel_distruction_penalty
+
+        
+
+    
+
+    
 
 
 """action space: normalise ->  [2,4,5] -> [4,16,32] -> sum = 52 - > [2,8,16] -> [10,40,80]
