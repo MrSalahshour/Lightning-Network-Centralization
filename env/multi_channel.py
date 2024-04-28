@@ -131,12 +131,12 @@ class FeeEnv(gym.Env):
         #
         # self.state = np.concatenate((np.zeros(shape=(self.n_nodes,)), np.zeros(shape=(self.n_nodes)),np.zeros(shape=(self.n_nodes))))
 
-        graph_embedding =self.get_new_graph_embedding(new_graph,self.embedding_mode)
+        self.graph_embedding =self.get_new_graph_embedding(new_graph,self.embedding_mode)
 
         self.state = {
             'capacities': np.zeros(self.n_nodes),
             'transaction_amounts': np.zeros(self.n_nodes),
-            'graph_embedding': graph_embedding
+            'graph_embedding': self.graph_embedding
         }
             
         self.time_step = 0
@@ -276,11 +276,7 @@ class FeeEnv(gym.Env):
         else:
             #changed from balanced-based to capacity-based
             # self.state = np.concatenate((connected_nodes, (capacities_list)/1000, (transaction_amounts_list)/1000))
-            self.state = {
-                'capacities': capacities_list,
-                'transaction_amounts': transaction_amounts_list,
-                'graph_embedding': np.zeros(self.embedding_size)
-            }
+            self.state["transaction_amounts"] = transaction_amounts, self.state["capacities"] = capacities_list 
 
         return self.state, reward, done, info
 
@@ -306,11 +302,11 @@ class FeeEnv(gym.Env):
             # self.state = np.concatenate((np.zeros(shape=(self.n_nodes,)), np.zeros(shape=(self.n_nodes)),np.zeros(shape=(self.n_nodes))))
             self.prev_action = []
             new_graph = self.set_new_graph_environment()
-            new_embedding = self.get_new_graph_embedding(new_graph,self.embedding_mode)
+            self.graph_embedding = self.get_new_graph_embedding(new_graph,self.embedding_mode)
             self.state = {
                 'capacities': np.zeros(self.n_nodes),
                 'transaction_amounts': np.zeros(self.n_nodes),
-                'graph_embedding': new_embedding #sample new embedding
+                'graph_embedding': self.graph_embedding #sample new embedding
             }
             return self.state 
             
@@ -376,6 +372,7 @@ class FeeEnv(gym.Env):
     
 
     def sample_graph_environment(self):
+        random.seed(0)
         sub_node = random.choice(self.list_of_sub_nodes)
         return sub_node
     

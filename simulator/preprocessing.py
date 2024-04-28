@@ -368,78 +368,102 @@ def get_init_parameters(providers, directed_edges, src, trgs, channel_ids, chann
 
      
     # #TODO: set back to normal: Has been set back to normal
-    # sub_nodes_list = []
-    # count = 0
-    # wait = 0
-    # not_connected=0
-    # too_small=0
-    # ##
-    # # Initialize an empty list to store the previous results
-    # previous_results = []
-    # # Initialize a counter to count the repetitions
-    # repetitions = 0
-    # ##
-    # while True:
-    #     if count == 50:
-    #         break
-    #     if wait == 5 or not_connected == 5 or too_small == 5:
-    #         break
+#  import pickle     
+#     with open('output.txt', 'a') as f:
+#         # Iterate over the values of 'k'
+#         for local_head_numbers in [10,20]:
+#             # Iterate over the values of 'stage'
+#             for k in [2, 3, 4]:
+#                 # Iterate over the values of 'local_head_numbers'
+#                 for stage in [1, 2, 3, 4, 5, 10]:
+#                     print(" ......... Beginning with k =",k,", stage=",stage," and local_head_numbers=",local_head_numbers," ...........")
+#                     sub_nodes_list = []
+#                     count = 0
+#                     wait = 0
+#                     not_connected=0
+#                     too_small=0
+#                     problem = False
+#                     ##
+#                     # Initialize an empty list to store the previous results
+#                     previous_results = []
+#                     # Initialize a counter to count the repetitions
+#                     repetitions = 0
+#                     ##
+#                     while True:
+#                         if count == 50:
+#                             break
+#                         if wait == 5 or not_connected == 5 or too_small == 5:
+#                             problem = True
+#                             break
+                            
+#                         #delete  sub_graph output
+#                         try:
+#                             network_dictionary, nodes, sub_providers, sub_edges, random_base_nodes = create_sub_network(directed_edges, providers, src, trgs,
+#                                                                                                  channel_ids, local_size,k,stage,local_head_numbers, manual_balance, initial_balances, capacities)
+#                         except GraphNotConnectedError as e:
+#                             not_connected+=1
+#                             print(e.message, " trying again")
+#                             continue
+#                         except GraphTooSmallError as e:
+#                             too_small+=1
+#                             print(e.message, " trying again")
+#                             continue
+                            
+#                         if nodes in sub_nodes_list:
+#                             wait = wait+1
+#                             print("waiting for new network.....")
+#                             continue
+#                         #resetting breaking criterias
+#                         wait = 0
+#                         not_connected=0
+#                         too_small=0
+                
+#                         for node in random_base_nodes:
+#                             if node in previous_results:
+#                                 repetitions+=1
+#                                 print("This Node:", node ,"Has been Seen Before")
+#                             else:
+#                                 previous_results.append(node)
+                        
+                        
+#                         sub_nodes_list.append(nodes)
+#                         count+=1
+#                         print("...........Created",count,"ith Sub Network...........")
+#                         # active_channels = create_active_channels(network_dictionary, channels)
+#                     jacard_scores = []
+#                     common_nodes = []
+#                     print("The number of created subgraphs is: ", len(sub_nodes_list))
+                
+#                     for i in range(count):
+#                         for j in range(i+1,count):
+                
+#                             nodes1, nodes2 = sub_nodes_list[i], sub_nodes_list[j]
+#                             jacard, common = jaccard_similarity(nodes1, nodes2)
+#                             jacard_scores.append(jacard)
+#                             common_nodes.append(common)
+
+    
+#                     # Write the values to the file
+#                     print("........................ WRITING OUTPUT ........................")
+#                     if problem == False and len(sub_nodes_list) == 50:
+#                         average_jaccard_distances = calculate_average(jacard_scores)
+#                         average_common_nodes = calculate_average(common_nodes)
+#                         f.write(f'k={k}, stage={stage}, local_head_numbers={local_head_numbers}, average_jaccard_distances={average_jaccard_distances}, average_common_nodes={average_common_nodes}\n')
+#                     else:
+#                         f.write(f' \n k={k}, stage={stage}, local_head_numbers={local_head_numbers}, Not Connected or too small \n')
+                        
+        
+    
+    
+        
+#         # with open("jacard.txt", "wb") as fp:   
+#         #     pickle.dump(jacard_scores, fp)
             
-    #     #delete  sub_graph output
-    #     try:
-    #         network_dictionary, nodes, sub_providers, sub_edges, random_base_nodes = create_sub_network(directed_edges, providers, src, trgs,
-    #                                                                              channel_ids, local_size, manual_balance, initial_balances, capacities, local_heads_number)
-    #     except GraphNotConnectedError as e:
-    #         not_connected+=1
-    #         print(e.message, " trying again")
-    #         continue
-    #     except GraphTooSmallError as e:
-    #         too_small+=1
-    #         print(e.message, " trying again")
-    #         continue
+#         # with open("common.txt", "wb") as fp:   
+#         #     pickle.dump(common_nodes, fp)
             
-    #     if nodes in sub_nodes_list:
-    #         wait = wait+1
-    #         print("waiting for new network.....")
-    #         continue
-    #     #resetting breaking criterias
-    #     wait = 0
-    #     not_connected=0
-    #     too_small=0
-
-    #     for node in random_base_nodes:
-    #         if node in previous_results:
-    #             repetitions+=1
-    #             print("This Node:", node ,"Has been Seen Before")
-    #         else:
-    #             previous_results.append(node)
-        
-        
-    #     sub_nodes_list.append(nodes)
-    #     count+=1
-    #     # active_channels = create_active_channels(network_dictionary, channels)
-    # jacard_scores = []
-    # common_nodes = []
-
-    # for i in range(count):
-    #     for j in range(i+1,count):
-
-    #         nodes1, nodes2 = sub_nodes_list[i], sub_nodes_list[j]
-    #         jacard, common = jaccard_similarity(nodes1, nodes2)
-            
-    #         jacard_scores.append(jacard)
-    #         common_nodes.append(common)
-
-
-    # import pickle
-    # with open("jacard.txt", "wb") as fp:   
-    #     pickle.dump(jacard_scores, fp)
-        
-    # with open("common.txt", "wb") as fp:   
-    #     pickle.dump(common_nodes, fp)
-        
-
-    # exit()
+    
+#         exit()
     balances, capacities = set_channels_balances_and_capacities(src,trgs,network_dictionary)
 
     
