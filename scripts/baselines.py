@@ -20,7 +20,7 @@ def evaluate(mode,strategy, env, env_params, gamma):
             #NOTE: Add env_params["scale"], apply to amounts when generating amount graphs
             if strategy == "top_k_betweenness":
                 graph = env.get_local_graph(scale=230000/(10000/env_params["amounts"][0]))
-            else: graph=None
+            else: graph = None
             #NOTE: should define a evaluation functions here to use as balinese evaluation for channel selection fee.
             action = get_channels_and_capacities_based_on_strategy(strategy,env_params['capacity_upper_scale_bound']
                                                                    ,env_params['n_channels'],env_params['local_size'], env.src,env.graph_nodes,graph)

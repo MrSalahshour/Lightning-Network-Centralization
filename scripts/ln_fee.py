@@ -30,6 +30,7 @@ class EarlyStoppingCallback(BaseCallback):
         return True
 
 def train(env_params, train_params, tb_log_dir, tb_name, log_dir, seed):
+
     data = load_data(env_params['mode'],env_params['node_index'], env_params['data_path'], env_params['merchants_path'], env_params['local_size'],
                      env_params['manual_balance'], env_params['initial_balances'], env_params['capacities'],env_params['n_channels'],env_params['local_heads_number'])
     env = make_env(data, env_params, seed)
@@ -58,13 +59,13 @@ def main():
     parser.add_argument('--max_episode_length', type=int, default=500)
     parser.add_argument('--local_size', type=int, default=100)
     parser.add_argument('--counts', default=[10, 10, 10], type=lambda s: [int(item) for item in s.split(',')])
-    parser.add_argument('--amounts', default=[100, 500, 1000], type=lambda s: [int(item) for item in s.split(',')])
+    parser.add_argument('--amounts', default=[10000, 40000, 80000], type=lambda s: [int(item) for item in s.split(',')])
     parser.add_argument('--epsilons', default=[.6, .6, .6], type=lambda s: [float(item) for item in s.split(',')])
     parser.add_argument('--manual_balance', default=False)
     parser.add_argument('--initial_balances', default=[], type=lambda s: [int(item) for item in s.split(',')])
     parser.add_argument('--capacities', default=[],type=lambda s: [int(item) for item in s.split(',')])
     parser.add_argument('--device', default='auto')
-    parser.add_argument('--max_capacity', type = int, default=10000) 
+    parser.add_argument('--max_capacity', type = int, default=1e8) #SAT
     parser.add_argument('--n_channels', type=int, default=7)
     parser.add_argument('--mode', type=str, default='channel_openning')#TODO: add this arg to all scripts
     parser.add_argument('--capacity_upper_scale_bound', type=int, default=25)
@@ -94,6 +95,8 @@ def main():
                   'n_channels': args.n_channels,
                   'capacity_upper_scale_bound': args.capacity_upper_scale_bound,
                   'local_heads_number':args.local_heads_number}
+
+    
 
     for seed in range(args.n_seed):
         train(env_params, train_params,

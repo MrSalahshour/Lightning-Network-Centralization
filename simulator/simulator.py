@@ -77,7 +77,7 @@ class simulator():
       val = self.network_dictionary[key]
       # val[0] represents balance key[0] src and key[1] target, val[1] is fee_base and val[2] is fee_rate
       if val[0] > amount :
-          graph.add_edge(key[0],key[1],weight = val[1]*amount + val[2])
+          graph.add_edge(key[0],key[1],weight = val[1]*amount/1000 + val[2]/1000) #NOTE: the fraction is because of changing to SAT
     
     return graph
 
@@ -343,8 +343,8 @@ class simulator():
         # print("bal:",bal)
         if bal >= amount:
           # print("Adding")
-          graph.add_edge(trg,self.src,weight = base_fees[2*i]*amount + fee_rates[2*i])
-          graph.add_edge(self.src,trg,weight = base_fees[2*i + 1]*amount + fee_rates[2*i + 1])
+          graph.add_edge(trg,self.src,weight = base_fees[2*i] + fee_rates[2*i]*amount)
+          graph.add_edge(self.src,trg,weight = base_fees[2*i + 1] + fee_rates[2*i + 1]*amount)
 
 
 

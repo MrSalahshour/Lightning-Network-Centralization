@@ -5,11 +5,15 @@ import secrets
 from simulator import preprocessing
 from env.multi_channel import FeeEnv
 import networkx as nx
+import os
+import pickle
+from sklearn.model_selection import train_test_split
 
 
 def make_agent(env, algo, device, tb_log_dir):
     #NOTE: You must use `MultiInputPolicy` when working with dict observation space, not MlpPolicy
     policy = "MlpPolicy"
+    policy = "MultiInputPolicy"
     # create model
     if algo == "PPO":
         from stable_baselines3 import PPO
@@ -42,14 +46,44 @@ def make_agent(env, algo, device, tb_log_dir):
 
 
 def make_env(data, env_params, seed):
+
     assert len(env_params['counts']) == len(env_params['amounts']) and len(env_params['counts']) == len(
         env_params['epsilons']), "number of transaction types missmatch"
-    env = FeeEnv(env_params["mode"],data,env_params['max_capacity'], env_params['fee_base_upper_bound'], env_params['max_episode_length'],
-                 len(env_params['counts']),
-                 env_params['counts'], env_params['amounts'], env_params['epsilons'],env_params['capacity_upper_scale_bound'],
-                 seed)
+    
+    directed_edges = preprocessing.get_directed_edges(env_params['data_path'])
+
+    G = preprocessing.make_LN_graph(directed_edges, env_params['manual_balance'], data["src"]
+    , data["trgs"], data["channel_ids"], env_params['capacities'], env_params['initial_balances'])
+
+    train_list_of_sub_nodes = get_or_create_list_of_sub_nodes(G, data['src'], env_params['local_heads_number'],
+    data['providers'], env_params['local_size'], list_size = 500,
+    train_filename='train_list_of_sub_nodes.pkl', test_filename='test_list_of_sub_nodes.pkl')
+
+    env = FeeEnv(env_params["mode"],data,env_params['max_capacity'], env_params['fee_base_upper_bound']
+                 , env_params['max_episode_length'],len(env_params['counts']),env_params['counts'],
+                env_params['amounts'], env_params['epsilons'],env_params['capacity_upper_scale_bound'],
+                  seed, train_list_of_sub_nodes,G)
 
     return env
+
+def get_or_create_list_of_sub_nodes(G, src, local_heads_number, providers, local_size, list_size = 500, train_filename='train_list_of_sub_nodes.pkl', test_filename='test_list_of_sub_nodes.pkl'):
+    # If the train file exists, load the list from the file
+    if os.path.exists(train_filename):
+        with open(train_filename, 'rb') as f:
+            return pickle.load(f)
+    
+    # If the train file doesn't exist, create the list, split it, save the train and test lists to the file, and then return the train list
+    else:
+        list_of_sub_nodes = preprocessing.create_list_of_sub_nodes(G, src, local_heads_number, providers, local_size, list_size)
+        train_list, test_list = train_test_split(list_of_sub_nodes, test_size=0.2, random_state=42)
+        
+        with open(train_filename, 'wb') as f:
+            pickle.dump(train_list, f)
+        
+        with open(test_filename, 'wb') as f:
+            pickle.dump(test_list, f)
+        
+        return train_list
 
 #TODO: #14 #13 mode to be set
 def load_data(mode, node, directed_edges_path, providers_path, local_size, manual_balance, initial_balances, capacities, n_channels,local_heads_number):
@@ -90,24 +124,27 @@ def load_data(mode, node, directed_edges_path, providers_path, local_size, manua
     # data['capacities'] = [153243, 8500000, 4101029, 5900000, 2500000, 7000000]
     # data['initial_balances'] = [153243 / 2, 8500000 / 2, 4101029 / 2, 5900000 / 2, 2500000 / 2, 7000000 / 2]
     
-    data['src'], data['trgs'], data['channel_ids'], _ = preprocessing.create_node(directed_edges, src, n_channels)
-    channels = []
-    for trg in data['trgs']:
-        channels.append((data['src'], trg))
-    data['active_channels'], \
-    data['network_dictionary'], \
-    data['node_variables'], \
-    data['active_providers'], \
-    data['initial_balances'], \
-    data['capacities'], \
-    data['fee_policy'],\
-    data['nodes']= preprocessing.get_init_parameters(data['providers'],
-                                                           directed_edges,
-                                                           data['src'], data['trgs'],
-                                                           data['channel_ids'],
-                                                           channels,
-                                                           local_size,
-                                                           manual_balance, initial_balances, capacities,mode,local_heads_number)
+    data['src'], data['trgs'], data['channel_ids'] = preprocessing.create_node(directed_edges, src, n_channels)
+    
+    #NOTE: this part is for fee selection mode
+    # channels = []
+    # for trg in data['trgs']:
+    #     channels.append((data['src'], trg))
+    data['fee_policy'] = preprocessing.create_fee_policy_dict(directed_edges)
+    # data['active_channels'], \
+    # data['network_dictionary'], \
+    # data['node_variables'], \
+    # data['active_providers'], \
+    # data['initial_balances'], \
+    # data['capacities'], \
+    # data['fee_policy'],\
+    # data['nodes']= preprocessing.get_init_parameters(data['providers'],
+    #                                                        directed_edges,
+    #                                                        data['src'], data['trgs'],
+    #                                                        data['channel_ids'],
+    #                                                        channels,
+    #                                                        local_size,
+    #                                                        manual_balance, initial_balances, capacities,mode,local_heads_number)
     return data
 
 
@@ -242,6 +279,7 @@ def load_model(algo, env_params, path):
         model = TD3.load(path=path)
     elif algo == 'A2C':
         from stable_baselines3 import A2C
+        print("LOAD:")
         model = A2C.load(path=path)
 
     else:
