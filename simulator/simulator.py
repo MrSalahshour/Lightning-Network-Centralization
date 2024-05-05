@@ -75,9 +75,10 @@ class simulator():
     graph = nx.DiGraph()
     for key in self.network_dictionary :
       val = self.network_dictionary[key]
-      # val[0] represents balance key[0] src and key[1] target, val[1] is fee_base and val[2] is fee_rate
+      # val[0] represents balance key[0] src and key[1] target, val[1] is fee_rate and val[2] is fee_base
+
       if val[0] > amount :
-          graph.add_edge(key[0],key[1],weight = val[1]*amount/1000 + val[2]/1000) #NOTE: the fraction is because of changing to SAT
+          graph.add_edge(key[0],key[1],weight = val[1]*amount + val[2]*1000) #to change the base rate to milli msat we multiply it to 1000
     
     return graph
 
@@ -129,6 +130,7 @@ class simulator():
         
 # Complementary
   def update_network_and_active_channels(self, action, prev_action):
+
     additive_channels, omitting_channels = self.delete_previous_action_differences(action, prev_action)
     self.add_to_network_and_active_channels(additive_channels)
     #add budgets if needed, format can be achieved via looking into functions
@@ -136,6 +138,8 @@ class simulator():
   
   # Complementary
   def delete_previous_action_differences(self, action, prev_action):
+
+
     '''
     In this function, channels of new action will be omited from the network iff they are old channels
     with new assigned capacities or 0 capacity.
@@ -164,7 +168,7 @@ class simulator():
           
           del self.active_channels[(self.src, trg)]
           del self.active_channels[(trg, self.src)]
-          
+
     # trgs in prev_action and not in action anymore      
     for trg in prev_action[:midpoint_prev_action]:
       if trg not in action[:midpoint_action]:
@@ -192,6 +196,7 @@ class simulator():
     cumulative_budget = 0
     for trg, bal in zip(additive_channels[:midpoint], additive_channels[midpoint:]):
       # [balance, fee_base, fee_rate, capacity]
+      #NOTE: this fee base and fee rate can be adjusted.
       self.network_dictionary[(self.src, trg)] = [bal, None, None, 2* bal]
       self.network_dictionary[(trg, self.src)] = [bal, None, None, 2* bal]
       
@@ -203,16 +208,17 @@ class simulator():
     return cumulative_budget
 
 
-  def get_local_graph(self, scale):
-    # self.sync_network_dictionary()
-    graph = nx.DiGraph()
-    for key in self.network_dictionary :
-      val = self.network_dictionary[key]
-      # val[0] represents balance key[0] src and key[1] target, val[1] is fee_base and val[2] is fee_rate
-      graph.add_edge(key[0],key[1],weight = val[1]*scale + val[2])
+  # def get_local_graph(self, scale):
+  #   # self.sync_network_dictionary()
+  #   graph = nx.DiGraph()
+
+  #   for key in self.network_dictionary :
+  #     val = self.network_dictionary[key]
+  #     # val[0] represents balance key[0] src and key[1] target, val[1] is fee_rate and val[2] is fee_base
+  #     graph.add_edge(key[0],key[1],weight = val[1]*scale + val[2])
     
-    assert self.src in self.network_dictionary
-    return graph
+  #   # assert self.src in self.network_dictionary
+  #   return graph
     
 
   def update_network_data(self, path, transaction_amount):
@@ -323,9 +329,6 @@ class simulator():
     #removing omitting channels from amount graphs
     for key in omitting_channels :
       for amount, graph in self.graphs_dict.items():
-        # print("Removing : ")
-        # print("ommitting channels:",omitting_channels)
-        # print("key in ommitting channels:",key)
         if graph.has_edge(self.src,key): #NOTE: why we should check? does it even added?
           graph.remove_edge(self.src,key)
         if graph.has_edge(self.src,key):
@@ -339,32 +342,15 @@ class simulator():
     for i in range(len(additive_ind)):
       trg, bal = additive_ind[i], additive_bal[i]
       for amount, graph in self.graphs_dict.items():
-        # print("amount:",amount)
-        # print("bal:",bal)
+
         if bal >= amount:
-          # print("Adding")
-          graph.add_edge(trg,self.src,weight = base_fees[2*i] + fee_rates[2*i]*amount)
-          graph.add_edge(self.src,trg,weight = base_fees[2*i + 1] + fee_rates[2*i + 1]*amount)
+          graph.add_edge(trg,self.src,weight = base_fees[2*i]*1000 + fee_rates[2*i]*amount) # to turn fee base to mili msat multiply to 1000
+          graph.add_edge(self.src,trg,weight = base_fees[2*i + 1]*1000 + fee_rates[2*i + 1]*amount) # to turn fee base to mili msat multiply to 1000
 
-
-
-    # print("Nodes of the graph: ")
-    # print(graph.nodes())
-
-    # # Print edges
-    # print("Edges of the graph: ")
-    # print(graph.edges())
-
-    
-          
-  
-        
-      
-    
 
   def preprocess_amount_graph(self,amount,action):
       if self.mode == 'channel_openning':
-        return self.graphs_dict[amount]
+         return self.graphs_dict[amount]
       
       graph = self.graphs_dict[amount]
       src = self.src
@@ -415,6 +401,8 @@ class simulator():
             transactions.at[index,"path"] = []
       # print("random transactions ended succussfully!")
       return transactions    #contains final result bits  #contains paths
+  
+  
 
 
  
@@ -649,11 +637,15 @@ class simulator():
     midpoint = len(additive_channels) // 2
     additive_channels = additive_channels[:midpoint]
     for trg in range (len(additive_channels)):
-      # print("additive_channels:", additive_channels)
-      # print("trg:", trg)
-      base,rate = self.fee_policy[additive_channels[trg]]
-      bases.extend([base, base])
-      rates.extend([rate, rate])
+
+      #check whether the node we are connecting to has a fee policy(if the node had channels before it has otherwise they have not so we set to defualt value)
+      if additive_channels[trg] in self.fee_policy:
+          base1, rate1 = self.fee_policy[additive_channels[trg]]
+      else:
+          base1, rate1 = (1e3, 250)
+      base2, rate2 = (1e3, 250)
+      bases.extend([base1, base2])
+      rates.extend([rate1, rate2])
       
     return rates + bases
   

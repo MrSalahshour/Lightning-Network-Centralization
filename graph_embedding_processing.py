@@ -8,7 +8,7 @@ from karateclub import Graph2Vec
 import networkx as nx
 
 #Note that the size of the graph embedding with default values would be 500.
-def get_feather_embedding(G):
+def get_feather_embedding(model, G):
     """
     This function generates a graph embedding for the input graph 'G' using the FeatherGraph model from the KarateClub library.
 
@@ -25,10 +25,16 @@ def get_feather_embedding(G):
     - seed: The seed for the random number generator, set to 42.
     - pooling: The pooling method applied to the node features, set to 'mean'.
     """
-    model = FeatherGraph(order=5, eval_points=25, theta_max=2.5, seed=42, pooling='mean')
+    # print(is_attributed(G))
+    G = nx.convert_node_labels_to_integers(G, first_label=0, ordering='default', label_attribute=None)
     model.fit([G])  
     graph_embedding = model.get_embedding()[0]
-    return graph_embedding
+    return model, graph_embedding
+
+def get_feather_embedder():
+    model = FeatherGraph(order=3, eval_points=9, theta_max=2.5, seed=42, pooling='mean')
+    return model
+
 
 #Note that the size of the graph embedding with default values would be 111.
 def get_geo_scattering_embedding(G):
@@ -72,7 +78,7 @@ def get_LDP_embedding(G):
     return graph_embedding
 
 #Note: This method works for attributed nodes too.
-def get_GL2Vec_embedding(G):
+def get_GL2Vec_embedding(graph_list):
     """
     This function generates a graph embedding for the input graph 'G' using the GL2Vec model from the KarateClub library.
 
@@ -94,12 +100,15 @@ def get_GL2Vec_embedding(G):
     - erase_base_features: Whether to erase the base features, set to False.
     """
     model = GL2Vec(wl_iterations=2, dimensions=128, workers=4, down_sampling=0.0001, epochs=10, learning_rate=0.025, min_count=5, seed=42, erase_base_features=False)
-    model.fit([G])  
-    graph_embedding = model.get_embedding()[0]
-    return graph_embedding
+    model.fit(graph_list)  
+    # graph_embedding =  model.infer([G])[0]
+
+    return model
 
 
 def get_Graph2Vec_embedding(G):
+    G = nx.convert_node_labels_to_integers(G, first_label=0, ordering='default', label_attribute=None)
+
     """
     This function generates a graph embedding for the input graph 'G' using the Graph2Vec model from the KarateClub library.
 
@@ -121,7 +130,22 @@ def get_Graph2Vec_embedding(G):
     - seed: The seed for the random number generator, set to 42.
     - erase_base_features: Whether to erase the base features, set to False.
     """
-    model = Graph2Vec(wl_iterations=2, attributed=False, dimensions=128, workers=4, down_sampling=0.0001, epochs=10, learning_rate=0.025, min_count=5, seed=42, erase_base_features=False)
+    model = Graph2Vec(wl_iterations=2, attributed=True, dimensions=128, workers=4, down_sampling=0.0001, epochs=10, learning_rate=0.025, min_count=5, seed=42, erase_base_features=False)
     model.fit([G])  
     graph_embedding = model.get_embedding()[0]
     return graph_embedding
+
+def is_attributed(G):
+    # Check if there is any edge attribute
+    for _, _, edge_data in G.edges(data=True):
+        if edge_data:
+            print("Edge attributes:")
+            for key, value in edge_data.items():
+                print(f"Attribute: {key}, Type: {type(value)}, Value: {value}")
+            return True
+
+    # If no node or edge attributes, then the graph is not attributed
+    return False
+
+def is_weighted(G):
+    return all('weight' in data for _, _, data in G.edges(data=True))

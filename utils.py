@@ -7,6 +7,7 @@ from env.multi_channel import FeeEnv
 import networkx as nx
 import os
 import pickle
+import graph_embedding_processing
 from sklearn.model_selection import train_test_split
 
 
@@ -45,7 +46,7 @@ def make_agent(env, algo, device, tb_log_dir):
     return model
 
 
-def make_env(data, env_params, seed):
+def make_env(data, env_params, seed, eval_mode):
 
     assert len(env_params['counts']) == len(env_params['amounts']) and len(env_params['counts']) == len(
         env_params['epsilons']), "number of transaction types missmatch"
@@ -55,16 +56,28 @@ def make_env(data, env_params, seed):
     G = preprocessing.make_LN_graph(directed_edges, env_params['manual_balance'], data["src"]
     , data["trgs"], data["channel_ids"], env_params['capacities'], env_params['initial_balances'])
 
-    train_list_of_sub_nodes = get_or_create_list_of_sub_nodes(G, data['src'], env_params['local_heads_number'],
-    data['providers'], env_params['local_size'], list_size = 500,
-    train_filename='train_list_of_sub_nodes.pkl', test_filename='test_list_of_sub_nodes.pkl')
+    if eval_mode==True:
+        test_filename='test_list_of_sub_nodes.pkl'
+        if os.path.exists(test_filename):
+            with open(test_filename, 'rb') as f:
+                list_of_sub_nodes = pickle.load(f)
+    else:
+        list_of_sub_nodes = get_or_create_list_of_sub_nodes(G, data['src'], env_params['local_heads_number'],
+        data['providers'], env_params['local_size'], list_size = 5000,
+        train_filename='train_list_of_sub_nodes.pkl', test_filename='test_list_of_sub_nodes.pkl')
 
     env = FeeEnv(env_params["mode"],data,env_params['max_capacity'], env_params['fee_base_upper_bound']
-                 , env_params['max_episode_length'],len(env_params['counts']),env_params['counts'],
+                , env_params['max_episode_length'],len(env_params['counts']),env_params['counts'],
                 env_params['amounts'], env_params['epsilons'],env_params['capacity_upper_scale_bound'],
-                  seed, train_list_of_sub_nodes,G)
+                seed, list_of_sub_nodes,G)
+
+
+
+    
 
     return env
+    
+
 
 def get_or_create_list_of_sub_nodes(G, src, local_heads_number, providers, local_size, list_size = 500, train_filename='train_list_of_sub_nodes.pkl', test_filename='test_list_of_sub_nodes.pkl'):
     # If the train file exists, load the list from the file
@@ -198,8 +211,7 @@ def get_channels_and_capacities_based_on_strategy(strategy,capacity_upper_scale_
 
     return action
 
-def get_top_k_betweenness(scale, n_channels, src, graph_nodes, graph,alpha=0.1):
-      
+def get_top_k_betweenness(scale, n_channels, src, graph_nodes, graph,alpha=2):
      nodes_by_betweenness = nx.betweenness_centrality(graph)
      if src in nodes_by_betweenness:
          del nodes_by_betweenness[src]

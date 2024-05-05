@@ -95,7 +95,7 @@ def snowball_sampling(G, initial_vertices, stages, k, local_size):
         
         sampled_vertices = new_vertices.difference(Union_set)
         if len(Union_set) + len(sampled_vertices)>local_size:
-            print(f"Cutting over {local_size}")
+            # print(f"Cutting over {local_size}")
             Union_set.update(set(random.sample(list(sampled_vertices), local_size - len(Union_set))))
             break
         Union_set.update(new_vertices)
@@ -160,6 +160,7 @@ def set_channels_balances(edges, src, trgs, channel_ids, capacities, initial_bal
 def create_network_dictionary(G):
     keys = list(zip(G["src"], G["trg"]))
     vals = [list(item) for item in zip([None] * len(G), G["fee_rate_milli_msat"], G['fee_base_msat'], G["capacity"])]
+
     network_dictionary = dict(zip(keys, vals))
     for index, row in G.iterrows():
         src = row['src']
@@ -188,6 +189,7 @@ def make_LN_graph(directed_edges, manual_balance, src, trgs, channel_ids, capaci
 
 def create_sub_network(directed_edges, providers, src, trgs, channel_ids, local_size, local_heads_number, manual_balance=False, initial_balances = [], capacities=[]):
     """creating network_dictionary, edges and providers for the local subgraph."""
+    print("............creating network_dictionary.................")
 
     G = make_LN_graph(directed_edges, manual_balance, src, trgs, channel_ids, capacities, initial_balances)
 
@@ -215,6 +217,7 @@ def get_sub_graph_properties(G,sub_nodes,providers):
 
     return network_dictionary, sub_providers, sub_edges, sub_graph
 
+
 def create_sampled_sub_node(G, src, local_heads_number, providers, local_size, sampling_mode = 'degree'):
     G.add_node(src)
     sub_nodes = set()
@@ -241,7 +244,7 @@ def create_sampled_sub_node(G, src, local_heads_number, providers, local_size, s
     sub_nodes.update(snowball_sampling(G,random_base_nodes,stages=4,k=4, local_size=local_size))
     if len(sub_nodes) < local_size:
         raise GraphTooSmallError()
-    print("subgraph created with size: ",len(sub_nodes)+1)
+    # print("subgraph created with size: ",len(sub_nodes)+1)
 
     
         
@@ -249,20 +252,20 @@ def create_sampled_sub_node(G, src, local_heads_number, providers, local_size, s
 
     #Check whether the sub nodes we choose for localization is connected or not
 
-    if is_subgraph_strongly_connected(G, sub_nodes):
-        print("The subgraph is strongly connected.")
-    else:
-        print("The subgraph is not strongly connected.")
-        raise GraphNotConnectedError()
-    print("lengths of components: ", [len(comp) for comp in components(G, sub_nodes)])
+    # if is_subgraph_strongly_connected(G, sub_nodes):
+    #     print("The subgraph is strongly connected.")
+    # else:
+    #     print("The subgraph is not strongly connected.")
+    #     raise GraphNotConnectedError()
+    # print("lengths of components: ", [len(comp) for comp in components(G, sub_nodes)])
 
     
     sub_nodes.add(src)
 
     return sub_nodes
 
-def create_list_of_sub_nodes(G, src, local_heads_number, providers, local_size, list_size = 500):
-    max_number_of_iteration = 1000
+def create_list_of_sub_nodes(G, src, local_heads_number, providers, local_size, list_size = 1000):
+    max_number_of_iteration = 10000
 
     list_of_sub_nodes = []
     counter = 0
@@ -271,6 +274,7 @@ def create_list_of_sub_nodes(G, src, local_heads_number, providers, local_size, 
             sub_node = create_sampled_sub_node(G, src, local_heads_number, providers, local_size, sampling_mode = 'degree')
             if sub_node not in list_of_sub_nodes:
                 list_of_sub_nodes.append(sub_node)
+                print("Added:-->",len(list_of_sub_nodes))
             else:
                 print("This Graph has been created before")
             counter+=1
@@ -284,9 +288,6 @@ def create_list_of_sub_nodes(G, src, local_heads_number, providers, local_size, 
             continue
 
     return list_of_sub_nodes
-
-
-
 
 
 def components(G, nodes):
@@ -478,9 +479,9 @@ def create_fee_policy_dict(directed_edges):
         "fee_rate_milli_msat": "median",
     }).reset_index()[["src","fee_base_msat","fee_rate_milli_msat"]]
     for i in range(len(temp)):
-        fee_policy_dict[temp["src"][i]] = (1, 0.00022) #median fee rates and fee base (sat)
+        # fee_policy_dict[temp["src"][i]] = (100, 0.00022) #median fee rates and fee base (sat)
         #NOTE: note that we can use the median of all policies for this
-        # fee_policy_dict[temp["src"][i]] = (temp["fee_base_msat"][i], temp["fee_rate_milli_msat"][i])
+        fee_policy_dict[temp["src"][i]] = (temp["fee_base_msat"][i], temp["fee_rate_milli_msat"][i])
 
     return fee_policy_dict
 

@@ -4,10 +4,16 @@ from gym.spaces import *
 from gym.utils import seeding
 import numpy as np
 import graph_embedding_processing
-import preprocessing
+from simulator import preprocessing
 from simulator.simulator import simulator
 from simulator.preprocessing import generate_transaction_types
+import time
+
 import random
+from collections import Counter
+import networkx as nx
+
+
 from scipy.special import softmax
 
 #TODO: #12 self.mode
@@ -58,25 +64,33 @@ class FeeEnv(gym.Env):
     """
 
     def __init__(self, mode, data, max_capacity, fee_base_upper_bound, max_episode_length, number_of_transaction_types, counts, amounts, epsilons, capacity_upper_scale_bound, seed, list_of_sub_nodes, LN_graph):
-        # Source node
+        # Source node\
+        # self.prev_G = None
+        self.embedder = None
+        self.total_channel_changes = 0
         self.list_of_sub_nodes = list_of_sub_nodes
         self.LN_graph = LN_graph
         self.data = data
         self.prev_action = []
         self.providers = data['providers']
-        self.src = self.data['src'] 
+        self.src = self.data['src']
+        self.n_channel = data['n_channels'] 
         self.transaction_types = generate_transaction_types(number_of_transaction_types, counts, amounts,
                                                        epsilons)
-        new_graph = self.set_new_graph_environment()
+        self.mode = mode
+        self.current_graph = self.set_new_graph_environment()
         # self.prev_violation = False
         #NOTE: added attribute
         self.n_nodes = len(self.data['nodes']) - 1 # nodes should be minus one to doesn't include our node
         # self.graph_nodes = list(self.data['nodes'])
         # self.graph_nodes.remove(self.src)
         print("Nodes: ",self.n_nodes)
-        self.mode = mode
-        self.embedding_mode = "Graph2Vec"
-        self.embedding_size = 128
+        self.graph_nodes = list(self.data['nodes'])
+        if self.src in self.graph_nodes:
+            self.graph_nodes.remove(self.src)
+        
+        self.embedding_mode = "feather"
+        self.embedding_size = 108
         print('action dim:', self.n_nodes)
         
 
@@ -131,7 +145,8 @@ class FeeEnv(gym.Env):
         #
         # self.state = np.concatenate((np.zeros(shape=(self.n_nodes,)), np.zeros(shape=(self.n_nodes)),np.zeros(shape=(self.n_nodes))))
 
-        self.graph_embedding =self.get_new_graph_embedding(new_graph,self.embedding_mode)
+
+        self.graph_embedding =self.get_new_graph_embedding(self.current_graph,self.embedding_mode)
 
         self.state = {
             'capacities': np.zeros(self.n_nodes),
@@ -158,6 +173,7 @@ class FeeEnv(gym.Env):
         #                            active_providers=self.data['active_providers'],
         #                            fee_policy = self.data["fee_policy"],
         #                            fixed_transactions=False)
+        self.transaction_amounts_list = np.zeros((self.n_nodes,))
 
         self.seed(seed)
 
@@ -200,8 +216,11 @@ class FeeEnv(gym.Env):
         # action = self.action_fix_index_to_capacity(self.capacities,action)
         # action = self.action_fix_to_id_format(action)
         action = self.aggregate_action(action)
-        if self.time_step%100==0:
-            print("action: ",action)
+        if self.time_step%10==0:
+            print("action: ",action,"time step: ",self.time_step)
+            print("embedding: ",self.graph_embedding[:10])
+  
+    
         # print("action after aggregate:",action)  
         action = self.map_action_to_capacity(action)
         # print("action after map action to capacity:",action)  
@@ -221,8 +240,12 @@ class FeeEnv(gym.Env):
         
         if self.mode == "channel_openning":
             #TODO: calculate how many channels deleted for penalty in the reward.
-            if len(self.prev_action)!=0:
-                channel_deletion_penalty = self.calculate_penalty(self.prev_action,action)
+            # if len(self.prev_action)!=0:
+            #     channel_deletion_penalty = self.calculate_penalty(self.prev_action,action)
+            #     # channel_deletion_penalty = 0
+            # else:
+            channel_deletion_penalty = 0
+
             self.prev_action = action
     
             #TODO: #11 set reasonable fees
@@ -230,14 +253,24 @@ class FeeEnv(gym.Env):
             
 
             self.simulator.update_amount_graph(additive_channels, ommitive_channels,fees)
-            # sum_second_part = np.sum(action[midpoint:]) 
-            
-            balances, transaction_amounts, transaction_numbers = self.simulate_transactions(fees,additive_channels,ommitive_channels)
-            
-            fees = fees[::2]
+            # sum_second_part = np.sum(action[midpoint:])
 
-            reward = np.sum(np.multiply(fees[0:self.n_channel], transaction_numbers ) + \
-                    np.multiply(fees[self.n_channel:], transaction_amounts)) - channel_deletion_penalty
+            if self.time_step + 1 == self.max_episode_length :
+                reward = 0
+                fees_to_use_for_reward = fees[::2]
+                for i in range(self.max_episode_length):
+                    balances, transaction_amounts, transaction_numbers = self.simulate_transactions(fees,additive_channels,ommitive_channels)
+                    reward += 1e-6 *(np.sum(np.multiply(fees_to_use_for_reward[0:self.n_channel], transaction_numbers ) + \
+                            np.multiply(fees_to_use_for_reward[self.n_channel:], transaction_amounts)) - channel_deletion_penalty)
+
+            else:
+                balances, transaction_amounts, transaction_numbers = self.simulate_transactions(fees,additive_channels,ommitive_channels)
+                
+                fees = fees[::2]
+
+
+                reward = 1e-6 *(np.sum(np.multiply(fees[0:self.n_channel], transaction_numbers ) + \
+                        np.multiply(fees[self.n_channel:], transaction_amounts)) - channel_deletion_penalty)
         else:
             balances, transaction_amounts, transaction_numbers = self.simulate_transactions(action)
             reward = 1e-6 * np.sum(np.multiply(action[0:self.n_channel], transaction_amounts) + \
@@ -259,13 +292,13 @@ class FeeEnv(gym.Env):
         # connected_nodes = np.zeros((self.n_nodes,))
         capacities_list = np.zeros((self.n_nodes,))
         # balances_list = np.zeros((self.n_nodes,))
-        transaction_amounts_list = np.zeros((self.n_nodes,))
+        # transaction_amounts_list = np.zeros((self.n_nodes,))
         # if violation == False: 
         for idx in range (len(action_idx[:midpoint])):
             # connected_nodes[action_idx[idx]] = 1
             # balances_list[action_idx[idx]] = balances[idx]
             capacities_list[action_idx[idx]] = action[idx+midpoint]
-            transaction_amounts_list[action_idx[idx]] = transaction_amounts[idx]
+            self.transaction_amounts_list[action_idx[idx]] += transaction_amounts[idx]
 
         # else:
         #     self.prev_violation = True
@@ -276,7 +309,12 @@ class FeeEnv(gym.Env):
         else:
             #changed from balanced-based to capacity-based
             # self.state = np.concatenate((connected_nodes, (capacities_list)/1000, (transaction_amounts_list)/1000))
-            self.state["transaction_amounts"] = transaction_amounts, self.state["capacities"] = capacities_list 
+        
+            self.state = {
+            'capacities': capacities_list,
+            'transaction_amounts': self.transaction_amounts_list,
+            'graph_embedding': self.graph_embedding
+        } 
 
         return self.state, reward, done, info
 
@@ -292,6 +330,7 @@ class FeeEnv(gym.Env):
     
 
     def reset(self):
+        # print("Total channels changes: ", self.total_channel_changes)
         print('episode ended!')
         self.time_step = 0
         if self.mode == 'fee_setting':
@@ -301,18 +340,21 @@ class FeeEnv(gym.Env):
         else:
             # self.state = np.concatenate((np.zeros(shape=(self.n_nodes,)), np.zeros(shape=(self.n_nodes)),np.zeros(shape=(self.n_nodes))))
             self.prev_action = []
-            new_graph = self.set_new_graph_environment()
-            self.graph_embedding = self.get_new_graph_embedding(new_graph,self.embedding_mode)
+            self.current_graph = self.set_new_graph_environment()
+            self.graph_embedding = self.get_new_graph_embedding(self.current_graph,self.embedding_mode)
             self.state = {
                 'capacities': np.zeros(self.n_nodes),
                 'transaction_amounts': np.zeros(self.n_nodes),
                 'graph_embedding': self.graph_embedding #sample new embedding
             }
+            self.transaction_amounts_list = np.zeros((self.n_nodes,))
+            self.total_channel_changes = 0
             return self.state 
-            
-            
         
-    
+    def is_weighted(self,G):
+        return all('weight' in G[u][v] for u, v in G.edges())
+
+
     def action_fix_index_to_capacity(self,capacities,action):
         midpoint = len(action) // 2
         fixed_action = [self.graph_nodes[i] for i in action[:midpoint]]
@@ -368,18 +410,79 @@ class FeeEnv(gym.Env):
 
 
     def get_local_graph(self,scale):
-        return self.simulator.get_local_graph(scale)
+        return self.current_graph
     
-
+    # def count_identical_items(self,list_of_sets):
+    #     n = len(list_of_sets)
+    #     identical_counts = [[0]*n for _ in range(n)]
+    #     for i in range(n):
+    #         for j in range(i+1, n):
+    #             identical_counts[i][j] = len(list_of_sets[i] & list_of_sets[j])
+    #             print("identical_count","i:",i,"j:",j,identical_counts[i][j])
+    #     return identical_counts
     def sample_graph_environment(self):
-        random.seed(0)
-        sub_node = random.choice(self.list_of_sub_nodes)
+        # subgraph_list = []
+        # counter = 0
+        # for sub_node in self.list_of_sub_nodes:
+        #     subgraph = self.LN_graph.subgraph(sub_node)
+        #     amount =  40000
+        #     for u, v, data in subgraph.edges(data=True):
+        #         fee_rate = data.get('fee_rate_milli_msat', 0)
+        #         fee_base = data.get('fee_base_msat', 0)
+        #         weight = 1e-6 * (fee_rate * amount + fee_base *1000)
+        #         subgraph[u][v]['weight'] = weight
+        #     subgraph_list.append(subgraph)
+        #     counter += 1
+        #     print("created graph :",counter)
+        # num_unique_graphs = self.count_unique_graphs(subgraph_list)
+        # print("num_unique_graphs", num_unique_graphs)
+        random.seed(time.time_ns())
+        index = random.randint(0, len(self.list_of_sub_nodes) - 1)
+        sub_node = self.list_of_sub_nodes[index]
+        # print("INDEX: ",index)
+        # print("IDENTICAL1: ", self.list_of_sub_nodes[index] == self.prev_G )
+        # print("IDENTICAL:",self.count_identical_items(self.list_of_sub_nodes))
+        
+        # if self.prev_G is None:
+        #     self.prev_G = sub_node
+        # else:
+        #     print("IDENTICAL2: ", sub_node == self.prev_G )
+        #     self.prev_G = sub_node
         return sub_node
     
+
+    def count_unique_graphs(self, graphs):
+        """
+        Counts the number of unique graphs in a list of graphs.
+
+        Args:
+            graphs (list): A list of nx.Graph objects.
+
+        Returns:
+            int: The number of unique graphs in the list.
+        """
+
+        # Convert the list of graphs to a set to remove duplicates.
+        graph_set = set(graphs)
+
+        # Return the size of the set, which represents the number of unique graphs.
+        return len(graph_set)
+
     def get_new_graph_embedding(self, G, embedding_mode):
+        # if self.prev_G is not None:
+        #     print("IDENTICAL: ",nx.is_isomorphic(G, self.prev_G))
+        # self.prev_G = G
 
         if embedding_mode == 'feather':
-            return graph_embedding_processing.get_feather_embedding(G)
+            if self.embedder == None:
+                self.embedder = graph_embedding_processing.get_feather_embedder()
+                model , graph_embedding = graph_embedding_processing.get_feather_embedding(self.embedder, G)
+                self.embedder = model
+            else:
+                model , graph_embedding = graph_embedding_processing.get_feather_embedding(self.embedder, G)
+                self.embedder = model
+
+            return graph_embedding
         
         elif embedding_mode == 'geo_scattering':
             return graph_embedding_processing.get_geo_scattering_embedding(G)
@@ -401,7 +504,18 @@ class FeeEnv(gym.Env):
     def set_new_graph_environment(self):
 
         sub_nodes = self.sample_graph_environment()
+
         network_dictionary, sub_providers, sub_edges, sub_graph = preprocessing.get_sub_graph_properties(self.LN_graph,sub_nodes,self.providers)
+
+        amount =  40000
+        for u, v, data in sub_graph.edges(data=True):
+            fee_rate = data.get('fee_rate_milli_msat', 0)
+            fee_base = data.get('fee_base_msat', 0)
+            weight = 1e-6 * (fee_rate * amount + fee_base *1000)
+            sub_graph[u][v]['weight'] = weight
+
+
+
         active_channels = preprocessing.create_active_channels(network_dictionary, [])
 
         try:
@@ -418,7 +532,8 @@ class FeeEnv(gym.Env):
         self.data['nodes'] = sub_nodes
 
         self.graph_nodes = list(self.data['nodes'])
-        self.graph_nodes.remove(self.src)
+        if self.src in self.graph_nodes:
+            self.graph_nodes.remove(self.src)
 
 
 
@@ -438,12 +553,32 @@ class FeeEnv(gym.Env):
         return sub_graph
     # one channel distruction would cost 10^7 msat
     def calculate_penalty(self,prev_action,action,channel_distruction_penalty = 10000):
-        set1 = set(prev_action)
-        set2 = set(action)
+        midpoint = len(action)//2
+        # max_episode_to_get_real_penalty = 100000
 
-        diff_items = set1.symmetric_difference(set2)
+        # penalty = min(channel_distruction_penalty,self.time_step*channel_distruction_penalty/max_episode_to_get_real_penalty)
+        penalty = channel_distruction_penalty
+        # penalty = 0
 
-        return len(diff_items) * channel_distruction_penalty
+
+        diff_items = self.min_changes(prev_action[:midpoint], action[:midpoint])
+        self.total_channel_changes += diff_items
+
+        return diff_items * penalty
+
+    def min_changes(self, list1, list2):
+        # Create multisets
+        multiset1 = Counter(list1)
+        multiset2 = Counter(list2)
+
+        # Find the difference between the two multisets
+        diff = multiset1 - multiset2
+
+        # The total number of changes is the sum of the differences
+        total_changes = sum(diff.values())
+
+        return total_changes
+    
 
         
 

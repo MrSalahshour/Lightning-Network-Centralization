@@ -1,9 +1,10 @@
-from utils import load_data, make_agent, make_env
+from utils import load_data, make_agent, make_env, load_model
 from stable_baselines3 import SAC, TD3, PPO
 from numpy import load
 import gym
 import numpy as np
 from stable_baselines3.common.callbacks import BaseCallback
+
 
 
 class EarlyStoppingCallback(BaseCallback):
@@ -17,7 +18,7 @@ class EarlyStoppingCallback(BaseCallback):
     def _on_step(self) -> bool:
         if self.n_calls % self.check_freq == 0:
             # Get the current reward estimate
-            x, y = self.model.ep_info_buffer.get()
+            x, y = self.model.ep_info_buffer.pop() 
             if y > self.best_reward:
                 self.best_reward = y
                 self.n_steps_since_best_reward = 0
@@ -33,11 +34,14 @@ def train(env_params, train_params, tb_log_dir, tb_name, log_dir, seed):
 
     data = load_data(env_params['mode'],env_params['node_index'], env_params['data_path'], env_params['merchants_path'], env_params['local_size'],
                      env_params['manual_balance'], env_params['initial_balances'], env_params['capacities'],env_params['n_channels'],env_params['local_heads_number'])
-    env = make_env(data, env_params, seed)
-    model = make_agent(env, train_params['algo'], train_params['device'], tb_log_dir)
+    env = make_env(data, env_params, seed,eval_mode = False)
+    # model = make_agent(env, train_params['algo'], train_params['device'], tb_log_dir)
+    model = load_model("PPO", env_params,"plotting/tb_results/trained_model/PPO_tensorboard")
+    model.set_env(env)
+
     #Add Callback for early stopping
-    callback = EarlyStoppingCallback(check_freq=1000, n_steps_without_progress=10000)
-    model.learn(total_timesteps=train_params['total_timesteps'], tb_log_name=tb_name, callback=callback)
+    # callback = EarlyStoppingCallback(check_freq=1000, n_steps_without_progress=10000)
+    model.learn(total_timesteps=train_params['total_timesteps'], tb_log_name=tb_name)
 
     # model.learn(total_timesteps=train_params['total_timesteps'], tb_log_name=tb_name)
     model.save(log_dir+tb_name)
@@ -55,18 +59,18 @@ def main():
     parser.add_argument('--log_dir', default='plotting/tb_results/trained_model/')
     parser.add_argument('--n_seed', type=int, default=1) # 5
     parser.add_argument('--fee_base_upper_bound', type=int, default=100)
-    parser.add_argument('--total_timesteps', type=int, default=100000)
-    parser.add_argument('--max_episode_length', type=int, default=500)
+    parser.add_argument('--total_timesteps', type=int, default=500000)
+    parser.add_argument('--max_episode_length', type=int, default=10)
     parser.add_argument('--local_size', type=int, default=100)
     parser.add_argument('--counts', default=[10, 10, 10], type=lambda s: [int(item) for item in s.split(',')])
-    parser.add_argument('--amounts', default=[10000, 40000, 80000], type=lambda s: [int(item) for item in s.split(',')])
+    parser.add_argument('--amounts', default=[10000, 50000, 100000], type=lambda s: [int(item) for item in s.split(',')])
     parser.add_argument('--epsilons', default=[.6, .6, .6], type=lambda s: [float(item) for item in s.split(',')])
     parser.add_argument('--manual_balance', default=False)
     parser.add_argument('--initial_balances', default=[], type=lambda s: [int(item) for item in s.split(',')])
     parser.add_argument('--capacities', default=[],type=lambda s: [int(item) for item in s.split(',')])
     parser.add_argument('--device', default='auto')
-    parser.add_argument('--max_capacity', type = int, default=1e8) #SAT
-    parser.add_argument('--n_channels', type=int, default=7)
+    parser.add_argument('--max_capacity', type = int, default=1e7) #SAT
+    parser.add_argument('--n_channels', type=int, default=3)
     parser.add_argument('--mode', type=str, default='channel_openning')#TODO: add this arg to all scripts
     parser.add_argument('--capacity_upper_scale_bound', type=int, default=25)
     parser.add_argument('--local_heads_number', type=int, default=5)
