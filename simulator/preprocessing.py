@@ -90,12 +90,10 @@ def snowball_sampling(G, initial_vertices, stages, k, local_size):
             break
         for vertex in sampled_vertices:
             neighbors = get_snowball_neighbors(G, vertex, k)
-            # print(f"{vertex} vertex, neigbors: \n {neighbors}")
             new_vertices.update(neighbors)
         
         sampled_vertices = new_vertices.difference(Union_set)
         if len(Union_set) + len(sampled_vertices)>local_size:
-            # print(f"Cutting over {local_size}")
             Union_set.update(set(random.sample(list(sampled_vertices), local_size - len(Union_set))))
             break
         Union_set.update(new_vertices)
@@ -224,52 +222,32 @@ def create_sampled_sub_node(G, src, local_heads_number, providers, local_size, s
 
     #NOTE: The following were replaced with weighted random sampling
     if sampling_mode == 'degree':
-        # random_base_nodes = get_base_nodes_by_degree(G,local_heads_number)
-        random_base_nodes =  random_k_nodes_weighted(G, local_heads_number)
+        random_base_nodes =  random_k_nodes_log_weighted(G, local_heads_number)
 
     if sampling_mode == 'betweenness':
-        random_base_nodes = get_base_nodes_by_betweenness_centrality(G,local_heads_number)
-        # random_base_nodes =  random_k_nodes_betweenness_weighted(G, local_heads_number)
+        random_base_nodes =  random_k_nodes_betweenness_weighted(G, local_heads_number)
 
     if sampling_mode == 'provider':
         random_base_nodes = get_random_provider(providers, local_heads_number)
-        print(f"random providers: {random_base_nodes}")
     
-    # NOTE:the following is the previous sampling code
-    # for random_base_node in random_base_nodes:
-    #         sub_nodes_temp = get_neighbors(G, random_base_node, local_size)
-    #         sub_nodes.update(sub_nodes_temp)
     
-    #NOTE: the following refers to snowball sampling with choice function being uniform random
     sub_nodes.update(snowball_sampling(G,random_base_nodes,stages=4,k=4, local_size=local_size))
     if len(sub_nodes) < local_size:
         raise GraphTooSmallError()
-    # print("subgraph created with size: ",len(sub_nodes)+1)
 
-    
-        
-    # sub_nodes = set(random.sample(list(sub_nodes), local_size))
-
-    #Check whether the sub nodes we choose for localization is connected or not
-
-    # if is_subgraph_strongly_connected(G, sub_nodes):
-    #     print("The subgraph is strongly connected.")
-    # else:
-    #     print("The subgraph is not strongly connected.")
-    #     raise GraphNotConnectedError()
-    # print("lengths of components: ", [len(comp) for comp in components(G, sub_nodes)])
-
+    if not is_subgraph_strongly_connected(G, sub_nodes):
+        raise GraphNotConnectedError()
     
     sub_nodes.add(src)
 
     return sub_nodes
 
-def create_list_of_sub_nodes(G, src, local_heads_number, providers, local_size, list_size = 1000):
+def create_list_of_sub_nodes(G, src, local_heads_number, providers, local_size, list_size = 5000):
     max_number_of_iteration = 10000
 
     list_of_sub_nodes = []
     counter = 0
-    while len(list_of_sub_nodes) < list_size or counter == max_number_of_iteration :
+    while len(list_of_sub_nodes) < list_size and counter <= max_number_of_iteration :
         try:
             sub_node = create_sampled_sub_node(G, src, local_heads_number, providers, local_size, sampling_mode = 'degree')
             if sub_node not in list_of_sub_nodes:
@@ -334,7 +312,7 @@ def select_node(directed_edges, src_index):
 
 #NOTE: creates the node for channel openning mode
 def create_node(directed_edges, src, number_of_channels):
-    trgs = []#number_of_channels*[None]
+    trgs = []
     max_id = max(directed_edges['channel_id'])
     channel_ids = [(max_id + i + 1) for i in range (number_of_channels*2)]
     return src, list(trgs), list(channel_ids)
@@ -470,19 +448,23 @@ def get_init_parameters(providers, directed_edges, src, trgs, channel_ids, chann
     
     return active_channels, network_dictionary, node_variables, active_providers, balances, capacities, fee_policy_dict, nodes
 
-def create_fee_policy_dict(directed_edges):
+def create_fee_policy_dict(directed_edges, src):
     #get fee_base and fee_rate median for each node
     fee_policy_dict = dict()
+    
+    median_base = directed_edges["fee_base_msat"].median()
+    median_rate = directed_edges["fee_rate_milli_msat"].median()
+    
     grouped = directed_edges.groupby(["src"])
     temp = grouped.agg({
         "fee_base_msat": "median",
         "fee_rate_milli_msat": "median",
     }).reset_index()[["src","fee_base_msat","fee_rate_milli_msat"]]
+    
     for i in range(len(temp)):
-        # fee_policy_dict[temp["src"][i]] = (100, 0.00022) #median fee rates and fee base (sat)
-        #NOTE: note that we can use the median of all policies for this
         fee_policy_dict[temp["src"][i]] = (temp["fee_base_msat"][i], temp["fee_rate_milli_msat"][i])
-
+        
+    fee_policy_dict[src] = (median_base, median_rate)
     return fee_policy_dict
 
 def set_channels_balances_and_capacities(src,trgs,network_dictionary):
@@ -502,16 +484,14 @@ def generate_transaction_types(number_of_transaction_types, counts, amounts, eps
     return transaction_types
 
 def get_random_provider(providers, number_of_heads):
-    # random.seed(42)
+    random.seed()
     return random.sample(providers, number_of_heads)
 
 def get_base_nodes_by_degree(G,number_of_heads):
-    # random.seed(42)
     top_k_degree_nodes = top_k_nodes(G, number_of_heads)
     return top_k_degree_nodes
 
 def get_base_nodes_by_betweenness_centrality(G,number_of_heads):
-    # random.seed(42)
     top_k_betweenness_centrality_nodes = top_k_nodes_betweenness(G, number_of_heads)
     return top_k_betweenness_centrality_nodes
 
@@ -528,36 +508,27 @@ def top_k_nodes(G, k):
     # Return only the nodes, not their degrees
     return [node for node, degree in top_k]
 
-def random_k_nodes_weighted(G, k):
+def random_k_nodes_log_weighted(G, k):
     # Compute the degree of each node
     random.seed()
     
     node_degrees = dict(G.degree())
     
-    
-    # Compute weights based on node degrees
-    # maximum_degree = math.log(max(node_degrees.values())+1)
     total_log_degree = sum([math.log(x+1) for x in node_degrees.values()])
     weights = {node: math.log(degree + 1) / total_log_degree for node, degree in node_degrees.items()}
-
-    # total_log_degree = sum([1 for x in node_degrees.values()])
-    # weights = {node: 1 / total_log_degree for node, degree in node_degrees.items()}
-
-    # Sample k nodes with weighted randomness
 
     sampled_nodes = random.choices(list(weights.keys()), weights=list(weights.values()), k=k)
 
     return sampled_nodes
 
 def random_k_nodes_betweenness_weighted(G, k):
-    # Compute the betweenness centrality of each node
+    random.seed()
+    
     node_betweenness = nx.betweenness_centrality(G)
 
-    # Compute weights based on betweenness centrality
     total_betweenness = sum(node_betweenness.values())
     weights = {node: centrality / total_betweenness for node, centrality in node_betweenness.items()}
 
-    # Sample k nodes with weighted randomness
     sampled_nodes = random.choices(list(weights.keys()), weights=list(weights.values()), k=k)
 
     return sampled_nodes

@@ -13,7 +13,7 @@ from sklearn.model_selection import train_test_split
 
 def make_agent(env, algo, device, tb_log_dir):
     #NOTE: You must use `MultiInputPolicy` when working with dict observation space, not MlpPolicy
-    policy = "MlpPolicy"
+    # policy = "MlpPolicy"
     policy = "MultiInputPolicy"
     # create model
     if algo == "PPO":
@@ -120,17 +120,19 @@ def load_data(mode, node, directed_edges_path, providers_path, local_size, manua
     """
     print('==================Loading Network Data==================')
     data = {}
+    
     # for fee selection mode
     # src_index = node
     
-    #TODO #6:
+    #TODO #6: check if the src is actually new 
     src = generate_hex_string(66)
     
-    subgraph_radius = 2
+    # subgraph_radius = 2
     data['providers'] = preprocessing.get_providers(providers_path)
     data['n_channels'] = n_channels
     
     directed_edges = preprocessing.get_directed_edges(directed_edges_path)
+    
     
     # for fee selection mode
     # data['src'], data['trgs'], data['channel_ids'], n_channels = preprocessing.select_node(directed_edges, src_index)
@@ -143,7 +145,7 @@ def load_data(mode, node, directed_edges_path, providers_path, local_size, manua
     # channels = []
     # for trg in data['trgs']:
     #     channels.append((data['src'], trg))
-    data['fee_policy'] = preprocessing.create_fee_policy_dict(directed_edges)
+    data['fee_policy'] = preprocessing.create_fee_policy_dict(directed_edges,src)
     # data['active_channels'], \
     # data['network_dictionary'], \
     # data['node_variables'], \

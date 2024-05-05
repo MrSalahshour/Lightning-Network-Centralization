@@ -35,9 +35,9 @@ def train(env_params, train_params, tb_log_dir, tb_name, log_dir, seed):
     data = load_data(env_params['mode'],env_params['node_index'], env_params['data_path'], env_params['merchants_path'], env_params['local_size'],
                      env_params['manual_balance'], env_params['initial_balances'], env_params['capacities'],env_params['n_channels'],env_params['local_heads_number'])
     env = make_env(data, env_params, seed,eval_mode = False)
-    # model = make_agent(env, train_params['algo'], train_params['device'], tb_log_dir)
-    model = load_model("PPO", env_params,"plotting/tb_results/trained_model/PPO_tensorboard")
-    model.set_env(env)
+    model = make_agent(env, train_params['algo'], train_params['device'], tb_log_dir)
+    # model = load_model("PPO", env_params,"plotting/tb_results/trained_model/PPO_tensorboard")
+    # model.set_env(env)
 
     #Add Callback for early stopping
     # callback = EarlyStoppingCallback(check_freq=1000, n_steps_without_progress=10000)
@@ -48,6 +48,14 @@ def train(env_params, train_params, tb_log_dir, tb_name, log_dir, seed):
 
 
 def main():
+    """
+    amounts:   in satoshi
+    fee_rate and fee_base:  in data {mmsat, msat}
+    capacity_upper_scale bound:  upper bound for action range(capacity)
+    maximum capacity:   in satoshi
+    local_heads_number: number of heads when creating subsamples
+    sampling_stage, sampling_k:    parameters of snowball_sampling
+    """
     import argparse
     parser = argparse.ArgumentParser(description='Lightning network environment for multichannel')
     parser.add_argument('--algo', choices=['PPO', 'TRPO', 'SAC', 'TD3', 'A2C', 'DDPG'], required=True)
@@ -74,6 +82,10 @@ def main():
     parser.add_argument('--mode', type=str, default='channel_openning')#TODO: add this arg to all scripts
     parser.add_argument('--capacity_upper_scale_bound', type=int, default=25)
     parser.add_argument('--local_heads_number', type=int, default=5)
+    parser.add_argument('--sampling_k', type=int, default=4)
+    parser.add_argument('--sampling_stages', type=int, default=4)
+
+    
 
     
     args = parser.parse_args()
@@ -98,7 +110,9 @@ def main():
                   'max_capacity': args.max_capacity,
                   'n_channels': args.n_channels,
                   'capacity_upper_scale_bound': args.capacity_upper_scale_bound,
-                  'local_heads_number':args.local_heads_number}
+                  'local_heads_number':args.local_heads_number,
+                  'sampling_k':args.sampling_k,
+                  'sampling_stages':args.sampling_stages}
 
     
 
