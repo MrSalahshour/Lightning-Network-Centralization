@@ -72,9 +72,6 @@ def make_env(data, env_params, seed, eval_mode):
                 seed, list_of_sub_nodes,G)
 
 
-
-    
-
     return env
     
 

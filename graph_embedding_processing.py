@@ -26,8 +26,8 @@ def get_feather_embedding(model, G):
     - pooling: The pooling method applied to the node features, set to 'mean'.
     """
     # print(is_attributed(G))
-    G = nx.convert_node_labels_to_integers(G, first_label=0, ordering='default', label_attribute=None)
-    model.fit([G])  
+    G_temp = nx.convert_node_labels_to_integers(G, first_label=0, ordering='default', label_attribute=None)
+    model.fit([G_temp])  
     graph_embedding = model.get_embedding()[0]
     return model, graph_embedding
 

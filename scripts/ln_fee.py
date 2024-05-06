@@ -40,7 +40,7 @@ def train(env_params, train_params, tb_log_dir, tb_name, log_dir, seed):
     # model.set_env(env)
 
     #Add Callback for early stopping
-    # callback = EarlyStoppingCallback(check_freq=1000, n_steps_without_progress=10000)
+    callback = EarlyStoppingCallback(check_freq=1000, n_steps_without_progress=10000)
     model.learn(total_timesteps=train_params['total_timesteps'], tb_log_name=tb_name)
 
     # model.learn(total_timesteps=train_params['total_timesteps'], tb_log_name=tb_name)

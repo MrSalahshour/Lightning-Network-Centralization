@@ -65,7 +65,6 @@ class FeeEnv(gym.Env):
 
     def __init__(self, mode, data, max_capacity, fee_base_upper_bound, max_episode_length, number_of_transaction_types, counts, amounts, epsilons, capacity_upper_scale_bound, seed, list_of_sub_nodes, LN_graph):
         # Source node\
-        # self.prev_G = None
         self.embedder = None
         self.total_channel_changes = 0
         self.list_of_sub_nodes = list_of_sub_nodes
@@ -74,17 +73,16 @@ class FeeEnv(gym.Env):
         self.prev_action = []
         self.providers = data['providers']
         self.src = self.data['src']
-        self.n_channel = data['n_channels'] 
+        self.n_channel = data['n_channels']
+        self.average_transaction_amounts =  amounts[1]
         self.transaction_types = generate_transaction_types(number_of_transaction_types, counts, amounts,
                                                        epsilons)
         self.mode = mode
         self.current_graph = self.set_new_graph_environment()
-        # self.prev_violation = False
-        #NOTE: added attribute
-        self.n_nodes = len(self.data['nodes']) - 1 # nodes should be minus one to doesn't include our node
-        # self.graph_nodes = list(self.data['nodes'])
-        # self.graph_nodes.remove(self.src)
-        print("Nodes: ",self.n_nodes)
+        
+        self.n_nodes = len(self.data['nodes']) - 1 # nodes should be minus one to not include our node
+       
+        print("number of nodes: ",self.n_nodes)
         self.graph_nodes = list(self.data['nodes'])
         if self.src in self.graph_nodes:
             self.graph_nodes.remove(self.src)
@@ -94,7 +92,6 @@ class FeeEnv(gym.Env):
         print('action dim:', self.n_nodes)
         
 
-        #TODO: #18 remember that the following lines are to be used in if structure after the structure of mode is being implemented
         #NOTE: The following lines are for fee selection mode
         '''# Base fee and fee rate for each channel of src
         self.action_space = spaces.Box(low=-1, high=+1, shape=(2 * self.n_channel,), dtype=np.float32)
@@ -108,43 +105,21 @@ class FeeEnv(gym.Env):
         # first n_channels are id's  of connected nodes and the seconds are corresponding  capacities
         # add self.capacities to the fields of env class'''
 
-        #NOTE: the following line is the total budget for the model to utilize in CHANNEL_OPENNING mode
         self.maximum_capacity = max_capacity
-        #TODO #8:
 
-        # self.action_space = spaces.MultiDiscrete([self.n_nodes for _ in range(self.n_channel)] + [len(self.capacities) for _ in range(self.n_channel)])
-        # self.action_space = Box(low = 0, high = max_capacity, shape=(self.n_nodes,), dtype=np.float32)
         self.action_space = spaces.MultiDiscrete([self.n_nodes for _ in range(self.n_channel)] + [capacity_upper_scale_bound for _ in range(self.n_channel)])
 
-
-
-        #NOTE: defining observation space
-        # The observation is a ndarray with shape (n_nodes + 2*n_channels,). The first part of the observation space is 2*n_nodes with the values of 0 or 1, indicating whether we connect a channel with it or not.
-        #The second part is 2*n_channels with the values corresponding to the balance of each channel and also accumulative transaction amounts in each time step.
-        #Please note that the dimensions for balance and transaction amounts start from n_nodes and n_nodes + n_channels respectively. This allows us to separate the node connection information from the channel balance and transaction amounts.
-
-        # self.max_balance = 100
-        # self.max_transaction_amount = 1000
-        # self.budget_scaling_constant = 1
-
-        # self.observation_space = MultiDiscrete([2] * (self.n_nodes) + [self.max_balance + 1] * (self.n_nodes) + [self.max_transaction_amount + 1] * (self.n_nodes))
-        # self.observation_space = MultiDiscrete([2] * (self.n_nodes) + [self.maximum_capacity/self.budget_scaling_constant] * (self.n_nodes) + [self.max_transaction_amount + 1] * (self.n_nodes))
-
-        
         self.observation_space = Dict({
             'capacities': Box(low=0, high=max_capacity, shape=(self.n_nodes,)),
             'transaction_amounts': Box(low=0, high=np.inf, shape=(self.n_nodes,)),
             'graph_embedding': Box(low=-np.inf, high=np.inf, shape=(self.embedding_size,))
         })
 
-        # Initial values of each channel for fee selection mode
+        #NOTE: Initial values of each channel for fee selection mode
         # self.initial_balances = data['initial_balances']
         # self.capacities = data['capacities']
         # self.state = np.append(self.initial_balances, np.zeros(shape=(self.n_channel,)))
         
-        #
-        # self.state = np.concatenate((np.zeros(shape=(self.n_nodes,)), np.zeros(shape=(self.n_nodes)),np.zeros(shape=(self.n_nodes))))
-
 
         self.graph_embedding =self.get_new_graph_embedding(self.current_graph,self.embedding_mode)
 
@@ -156,7 +131,8 @@ class FeeEnv(gym.Env):
             
         self.time_step = 0
         self.max_episode_length = max_episode_length
-        # for fee selection
+        
+        #NOTE: for fee selection
         # self.balance_ratio = 0.1
 
         # Simulator
@@ -173,9 +149,11 @@ class FeeEnv(gym.Env):
         #                            active_providers=self.data['active_providers'],
         #                            fee_policy = self.data["fee_policy"],
         #                            fixed_transactions=False)
+        # self.seed(seed)
+        
+        
         self.transaction_amounts_list = np.zeros((self.n_nodes,))
 
-        self.seed(seed)
 
 
     def seed(self, seed=None):
@@ -421,34 +399,10 @@ class FeeEnv(gym.Env):
     #             print("identical_count","i:",i,"j:",j,identical_counts[i][j])
     #     return identical_counts
     def sample_graph_environment(self):
-        # subgraph_list = []
-        # counter = 0
-        # for sub_node in self.list_of_sub_nodes:
-        #     subgraph = self.LN_graph.subgraph(sub_node)
-        #     amount =  40000
-        #     for u, v, data in subgraph.edges(data=True):
-        #         fee_rate = data.get('fee_rate_milli_msat', 0)
-        #         fee_base = data.get('fee_base_msat', 0)
-        #         weight = 1e-6 * (fee_rate * amount + fee_base *1000)
-        #         subgraph[u][v]['weight'] = weight
-        #     subgraph_list.append(subgraph)
-        #     counter += 1
-        #     print("created graph :",counter)
-        # num_unique_graphs = self.count_unique_graphs(subgraph_list)
-        # print("num_unique_graphs", num_unique_graphs)
-        random.seed(time.time_ns())
-        index = random.randint(0, len(self.list_of_sub_nodes) - 1)
-        sub_node = self.list_of_sub_nodes[index]
-        # print("INDEX: ",index)
-        # print("IDENTICAL1: ", self.list_of_sub_nodes[index] == self.prev_G )
-        # print("IDENTICAL:",self.count_identical_items(self.list_of_sub_nodes))
         
-        # if self.prev_G is None:
-        #     self.prev_G = sub_node
-        # else:
-        #     print("IDENTICAL2: ", sub_node == self.prev_G )
-        #     self.prev_G = sub_node
-        return sub_node
+        random.seed()
+                
+        return random.choice(self.list_of_sub_nodes)
     
 
     def count_unique_graphs(self, graphs):
@@ -469,9 +423,6 @@ class FeeEnv(gym.Env):
         return len(graph_set)
 
     def get_new_graph_embedding(self, G, embedding_mode):
-        # if self.prev_G is not None:
-        #     print("IDENTICAL: ",nx.is_isomorphic(G, self.prev_G))
-        # self.prev_G = G
 
         if embedding_mode == 'feather':
             if self.embedder == None:
@@ -501,20 +452,23 @@ class FeeEnv(gym.Env):
         
         return None
     
+    def make_graph_weighted(self,graph, amount):
+        #weights  based on satoshi
+        for u, v, data in graph.edges(data=True):
+            fee_rate = data.get('fee_rate_milli_msat', 0)
+            fee_base = data.get('fee_base_msat', 0)
+            weight = 1e-6 * (fee_rate * amount + fee_base *1000)
+            graph[u][v]['weight'] = weight
+            
+        return graph
+        
     def set_new_graph_environment(self):
 
         sub_nodes = self.sample_graph_environment()
 
         network_dictionary, sub_providers, sub_edges, sub_graph = preprocessing.get_sub_graph_properties(self.LN_graph,sub_nodes,self.providers)
-
-        amount =  40000
-        for u, v, data in sub_graph.edges(data=True):
-            fee_rate = data.get('fee_rate_milli_msat', 0)
-            fee_base = data.get('fee_base_msat', 0)
-            weight = 1e-6 * (fee_rate * amount + fee_base *1000)
-            sub_graph[u][v]['weight'] = weight
-
-
+        
+        sub_graph = self.make_graph_weighted(sub_graph, amount = self.average_transaction_amounts)
 
         active_channels = preprocessing.create_active_channels(network_dictionary, [])
 
@@ -548,7 +502,7 @@ class FeeEnv(gym.Env):
                                    node_variables=self.data['node_variables'],
                                    active_providers=self.data['active_providers'],
                                    fee_policy = self.data["fee_policy"],
-                                   fixed_transactions=False)
+                                   fixed_transactions=True)
         
         return sub_graph
     # one channel distruction would cost 10^7 msat
