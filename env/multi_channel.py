@@ -15,8 +15,9 @@ import networkx as nx
 
 
 from scipy.special import softmax
+import math
 
-#TODO: #12 self.mode
+
 class FeeEnv(gym.Env):
     """
     ### Description
@@ -110,7 +111,7 @@ class FeeEnv(gym.Env):
         self.action_space = spaces.MultiDiscrete([self.n_nodes for _ in range(self.n_channel)] + [capacity_upper_scale_bound for _ in range(self.n_channel)])
 
         self.observation_space = Dict({
-            'capacities': Box(low=0, high=max_capacity, shape=(self.n_nodes,)),
+            'capacities': Box(low=0, high=capacity_upper_scale_bound, shape=(self.n_nodes,)),
             'transaction_amounts': Box(low=0, high=np.inf, shape=(self.n_nodes,)),
             'graph_embedding': Box(low=-np.inf, high=np.inf, shape=(self.embedding_size,))
         })
@@ -132,6 +133,9 @@ class FeeEnv(gym.Env):
         self.time_step = 0
         self.max_episode_length = max_episode_length
         
+        self.transaction_amounts_list = np.zeros((self.n_nodes,))
+
+        
         #NOTE: for fee selection
         # self.balance_ratio = 0.1
 
@@ -152,7 +156,6 @@ class FeeEnv(gym.Env):
         # self.seed(seed)
         
         
-        self.transaction_amounts_list = np.zeros((self.n_nodes,))
 
 
 
@@ -187,23 +190,18 @@ class FeeEnv(gym.Env):
     
     
     def step(self, action):
-        # Execute one time step within the environment
-        # The second part of the action is action[midpoint:]
-        action_idx = action.copy()
-        # print("action:",action)    
-        # action = self.action_fix_index_to_capacity(self.capacities,action)
-        # action = self.action_fix_to_id_format(action)
-        action = self.aggregate_action(action)
-        if self.time_step%10==0:
+        
+        action = self.aggregate_and_standardize_action(action)
+                
+        raw_action = action.copy()
+        
+        if self.time_step%100==0:
             print("action: ",action,"time step: ",self.time_step)
-            print("embedding: ",self.graph_embedding[:10])
   
     
-        # print("action after aggregate:",action)  
         action = self.map_action_to_capacity(action)
-        # print("action after map action to capacity:",action)  
         midpoint = len(action) // 2
-        # updating trgs in simulator
+
         self.simulator.trgs = action[:midpoint]
         self.n_channel = midpoint
          
@@ -211,84 +209,42 @@ class FeeEnv(gym.Env):
         In the following couple of lines, new channels are being added to the network, along with active_
         _channels dict and also, channels not present anymore, will be deleted
         '''
-        violation = False
         #attention: budget removed
         additive_channels, ommitive_channels = self.simulator.update_network_and_active_channels(action, self.prev_action)
 
+        self.prev_action = action
+
+        fees = self.simulator.get_additive_channel_fees(action)
         
-        if self.mode == "channel_openning":
-            #TODO: calculate how many channels deleted for penalty in the reward.
-            # if len(self.prev_action)!=0:
-            #     channel_deletion_penalty = self.calculate_penalty(self.prev_action,action)
-            #     # channel_deletion_penalty = 0
-            # else:
-            channel_deletion_penalty = 0
+        self.simulator.update_amount_graph(additive_channels, ommitive_channels,fees)
 
-            self.prev_action = action
-    
-            #TODO: #11 set reasonable fees
-            fees = self.simulator.get_channel_fees(action)
+        fees_to_use_for_reward = fees[::2]
+        if self.time_step + 1 == self.max_episode_length :
+            reward = 0
             
+            for i in range(self.max_episode_length):
+                balances, transaction_amounts, transaction_numbers = self.simulate_transactions(fees,additive_channels)
+                reward += 1e-6 *(np.sum(np.multiply(fees_to_use_for_reward[0:self.n_channel], transaction_amounts) + \
+                        np.multiply(fees_to_use_for_reward[self.n_channel:], transaction_numbers)))
 
-            self.simulator.update_amount_graph(additive_channels, ommitive_channels,fees)
-            # sum_second_part = np.sum(action[midpoint:])
-
-            if self.time_step + 1 == self.max_episode_length :
-                reward = 0
-                fees_to_use_for_reward = fees[::2]
-                for i in range(self.max_episode_length):
-                    balances, transaction_amounts, transaction_numbers = self.simulate_transactions(fees,additive_channels,ommitive_channels)
-                    reward += 1e-6 *(np.sum(np.multiply(fees_to_use_for_reward[0:self.n_channel], transaction_numbers ) + \
-                            np.multiply(fees_to_use_for_reward[self.n_channel:], transaction_amounts)) - channel_deletion_penalty)
-
-            else:
-                balances, transaction_amounts, transaction_numbers = self.simulate_transactions(fees,additive_channels,ommitive_channels)
-                
-                fees = fees[::2]
-
-
-                reward = 1e-6 *(np.sum(np.multiply(fees[0:self.n_channel], transaction_numbers ) + \
-                        np.multiply(fees[self.n_channel:], transaction_amounts)) - channel_deletion_penalty)
         else:
-            balances, transaction_amounts, transaction_numbers = self.simulate_transactions(action)
-            reward = 1e-6 * np.sum(np.multiply(action[0:self.n_channel], transaction_amounts) + \
-                        np.multiply(action[self.n_channel:2 * self.n_channel], transaction_numbers))
-
-        # Running simulator for a certain time interval
-        # print("prev_action:", self.prev_action)
-        # print("time_step: ", self.time_step)
-            
-            
+            balances, transaction_amounts, transaction_numbers = self.simulate_transactions(fees,additive_channels)
+            reward = 1e-6 *(np.sum(np.multiply(fees_to_use_for_reward[0:self.n_channel], transaction_amounts ) + \
+                    np.multiply(fees_to_use_for_reward[self.n_channel:], transaction_numbers)))
 
         self.time_step += 1
         
         info = {'TimeLimit.truncated': True if self.time_step >= self.max_episode_length else False}
         done = self.time_step >= self.max_episode_length
-        # if self.prev_violation == True:
-        #     done = True
-        
-        # connected_nodes = np.zeros((self.n_nodes,))
-        capacities_list = np.zeros((self.n_nodes,))
-        # balances_list = np.zeros((self.n_nodes,))
-        # transaction_amounts_list = np.zeros((self.n_nodes,))
-        # if violation == False: 
-        for idx in range (len(action_idx[:midpoint])):
-            # connected_nodes[action_idx[idx]] = 1
-            # balances_list[action_idx[idx]] = balances[idx]
-            capacities_list[action_idx[idx]] = action[idx+midpoint]
-            self.transaction_amounts_list[action_idx[idx]] += transaction_amounts[idx]
 
-        # else:
-        #     self.prev_violation = True
-        #     print("....................VIOLAION IN BUDGET...........................")            
-        #NOTE: what should we do to the state if we violate (for now we set all connections and transactions and balance to zero)    
-        if self.mode == "fee_setting":
-            self.state = np.append(balances, transaction_amounts)/1000
-        else:
-            #changed from balanced-based to capacity-based
-            # self.state = np.concatenate((connected_nodes, (capacities_list)/1000, (transaction_amounts_list)/1000))
+        capacities_list = np.zeros((self.n_nodes,))
         
-            self.state = {
+        for idx, in range(midpoint):
+            capacities_list[raw_action[idx]] = raw_action[idx+midpoint]
+            self.transaction_amounts_list[raw_action[idx]] += transaction_amounts[idx]
+  
+        
+        self.state = {
             'capacities': capacities_list,
             'transaction_amounts': self.transaction_amounts_list,
             'graph_embedding': self.graph_embedding
@@ -296,7 +252,7 @@ class FeeEnv(gym.Env):
 
         return self.state, reward, done, info
 
-    def simulate_transactions(self, action, additive_channels = None, ommitive_channels = None):
+    def simulate_transactions(self, action, additive_channels = None):
         #NOTE: fees set in the step, now will be added to network_dict and active_channels
         self.simulator.set_channels_fees(self.mode,action,additive_channels[:len(additive_channels)//2])
 
@@ -308,7 +264,6 @@ class FeeEnv(gym.Env):
     
 
     def reset(self):
-        # print("Total channels changes: ", self.total_channel_changes)
         print('episode ended!')
         self.time_step = 0
         if self.mode == 'fee_setting':
@@ -316,7 +271,6 @@ class FeeEnv(gym.Env):
             return np.array(self.state, dtype=np.float64)
         
         else:
-            # self.state = np.concatenate((np.zeros(shape=(self.n_nodes,)), np.zeros(shape=(self.n_nodes)),np.zeros(shape=(self.n_nodes))))
             self.prev_action = []
             self.current_graph = self.set_new_graph_environment()
             self.graph_embedding = self.get_new_graph_embedding(self.current_graph,self.embedding_mode)
@@ -326,7 +280,6 @@ class FeeEnv(gym.Env):
                 'graph_embedding': self.graph_embedding #sample new embedding
             }
             self.transaction_amounts_list = np.zeros((self.n_nodes,))
-            self.total_channel_changes = 0
             return self.state 
         
     def is_weighted(self,G):
@@ -342,39 +295,36 @@ class FeeEnv(gym.Env):
     def map_action_to_capacity(self, action):
         midpoint = len(action) // 2
         fixed_action = []
-        fixed_indices = []
         #seeting up trgs from their ind
         fixed_trgs = [self.graph_nodes[i] for i in action[:midpoint]]
-        #applying the softmax
-        for i in range(midpoint):
-            if action[i+midpoint] != 0:
-                fixed_indices.append(i)
-                fixed_action.append(action[i+midpoint])
         
-        if len(fixed_action) != 0:
-            fixed_action = softmax(np.array(fixed_action)) * self.maximum_capacity
-        
-        #putting into action
-        output = [0] * midpoint
-        for i in range(len(fixed_indices)):
-            output[fixed_indices[i]] = fixed_action[i]
-        
-        return fixed_trgs+output
+        if len(action) != 0:
+            fixed_action = softmax(np.array(action[midpoint:])) * self.maximum_capacity      
+      
+        return fixed_trgs+fixed_action.tolist()
                 
             
     
-    def aggregate_action(self,action):
+    def aggregate_and_standardize_action(self,action):
         midpoint = len(action) // 2
         unique_nodes = list(set(action[:midpoint]))
+        nonzero_unique_nodes = []
         action_bal = []
-        
+          
         for node in unique_nodes:
             agg_bal = 0
             for i in range(midpoint):
                 if action[i] == node:
                     agg_bal += action[i+midpoint]
-            action_bal.append(agg_bal)
-        return unique_nodes + action_bal
+            if agg_bal !=0:
+                nonzero_unique_nodes.append(node)
+                action_bal.append(agg_bal)
+        
+        #Standardizing the balances
+        bal_gcd = math.gcd(*action_bal)
+        action_bal = [balance/bal_gcd for balance in action_bal]
+        
+        return nonzero_unique_nodes + action_bal
     
     def action_fix(action):
         connected_node_ids = []
@@ -502,7 +452,7 @@ class FeeEnv(gym.Env):
                                    node_variables=self.data['node_variables'],
                                    active_providers=self.data['active_providers'],
                                    fee_policy = self.data["fee_policy"],
-                                   fixed_transactions=True)
+                                   fixed_transactions=False)
         
         return sub_graph
     # one channel distruction would cost 10^7 msat

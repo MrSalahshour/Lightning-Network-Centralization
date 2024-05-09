@@ -18,7 +18,7 @@ class EarlyStoppingCallback(BaseCallback):
     def _on_step(self) -> bool:
         if self.n_calls % self.check_freq == 0:
             # Get the current reward estimate
-            x, y = self.model.ep_info_buffer.pop() 
+            x, y = self.model.ep_info_buffer.pop() #infos.get("episode")
             if y > self.best_reward:
                 self.best_reward = y
                 self.n_steps_since_best_reward = 0
@@ -40,7 +40,7 @@ def train(env_params, train_params, tb_log_dir, tb_name, log_dir, seed):
     # model.set_env(env)
 
     #Add Callback for early stopping
-    callback = EarlyStoppingCallback(check_freq=1000, n_steps_without_progress=10000)
+    callback = EarlyStoppingCallback(check_freq=10, n_steps_without_progress=1000)
     model.learn(total_timesteps=train_params['total_timesteps'], tb_log_name=tb_name)
 
     # model.learn(total_timesteps=train_params['total_timesteps'], tb_log_name=tb_name)
