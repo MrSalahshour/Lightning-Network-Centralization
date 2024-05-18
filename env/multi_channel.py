@@ -64,11 +64,12 @@ class FeeEnv(gym.Env):
     We are adding the income from each payment to the balance of the corresponding channel.
     """
 
-    def __init__(self, mode, data, max_capacity, fee_base_upper_bound, max_episode_length, number_of_transaction_types, counts, amounts, epsilons, capacity_upper_scale_bound, seed, list_of_sub_nodes, LN_graph):
+    def __init__(self, mode, data, max_capacity, fee_base_upper_bound, max_episode_length,
+                  number_of_transaction_types, counts, amounts, epsilons, capacity_upper_scale_bound,
+                    seed, LN_graph):
         # Source node\
         self.embedder = None
         self.total_channel_changes = 0
-        self.list_of_sub_nodes = list_of_sub_nodes
         self.LN_graph = LN_graph
         self.data = data
         self.prev_action = []
@@ -348,11 +349,46 @@ class FeeEnv(gym.Env):
     #             identical_counts[i][j] = len(list_of_sets[i] & list_of_sets[j])
     #             print("identical_count","i:",i,"j:",j,identical_counts[i][j])
     #     return identical_counts
+
     def sample_graph_environment(self):
         
         random.seed()
-                
-        return random.choice(self.list_of_sub_nodes)
+        sampled_graph = preprocessing.get_fire_forest_sample(self.LN_graph,self.n_nodes)    
+        return list(sampled_graph.nodes())
+    
+    def evolve_graph(self, G, number_of_new_channels):
+
+        transformed_graph = self.add_edges(G, number_of_new_channels)
+
+        return transformed_graph
+    
+    def add_edges(G, k): #Note we have to add edge feautres and update network dictionary
+        #(and maybe other places that get influenced by adding new channels)
+
+        fees = self.simulator.get_additive_channel_fees(action)
+        
+        self.simulator.update_amount_graph(additive_channels, ommitive_channels,fees)
+
+        
+        # Calculate degree of each node
+        degrees = dict(G.degree())
+        
+        # Create a distribution based on logarithm of degree of nodes
+        log_degrees = np.log(np.array(list(degrees.values())) + 1)
+        distribution = log_degrees / np.sum(log_degrees)
+        
+        nodes = list(G.nodes())
+        for _ in range(k):
+            # Sample two nodes based on the distribution
+            node1, node2 = np.random.choice(nodes, size=2, replace=False, p=distribution)
+
+            
+            # Add edge if not already exists
+            if not G.has_edge(node1, node2):
+                G.add_edge(node1, node2)
+                G.add_edge(node2, node1)  # For directed graph, add both way edges
+
+        return G
     
 
     def count_unique_graphs(self, graphs):
@@ -455,6 +491,7 @@ class FeeEnv(gym.Env):
                                    fixed_transactions=False)
         
         return sub_graph
+    
     # one channel distruction would cost 10^7 msat
     def calculate_penalty(self,prev_action,action,channel_distruction_penalty = 10000):
         midpoint = len(action)//2
@@ -484,24 +521,3 @@ class FeeEnv(gym.Env):
         return total_changes
     
 
-        
-
-    
-
-    
-
-
-"""action space: normalise ->  [2,4,5] -> [4,16,32] -> sum = 52 - > [2,8,16] -> [10,40,80]
-    softmax(x-1; x!=0) * max_budget;
-    dimensionality:(10, 11)
-    
-
-
-observation space: omit balance
-(connected_nodes, capacity, transaction amount)
-
-functions to be updated:
-ommiting, additive; updating budget
-
-
-"""
