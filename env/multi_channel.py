@@ -361,13 +361,37 @@ class FeeEnv(gym.Env):
         transformed_graph = self.add_edges(G, number_of_new_channels)
 
         return transformed_graph
-    
-    def add_edges(G, k): #Note we have to add edge feautres and update network dictionary
-        #(and maybe other places that get influenced by adding new channels)
+    def fetch_new_pairs_for_create_new_channels(self, G, number_of_new_channels):
+        #Return a list of tuples containing (src,trg) pairs for each channel to be created.
+        #[(src1,trg1), (src2,trg2),...]
+        list_of_pairs = []
+        degree_sequence = [d for n, d in G.degree()]
 
-        fees = self.simulator.get_additive_channel_fees(action)
-        
-        self.simulator.update_amount_graph(additive_channels, ommitive_channels,fees)
+        # Create distribution based on logarithm of degree
+        log_degree_sequence = np.log(degree_sequence)
+        log_degree_distribution = {node: deg for node, deg in zip(G.nodes(), log_degree_sequence)}
+
+        # Create distribution based on inverse of the logarithmic degree
+        inv_log_degree_sequence = 1 / log_degree_sequence
+        inv_log_degree_distribution = {node: deg for node, deg in zip(G.nodes(), inv_log_degree_sequence)}
+        random.seed()
+        for i in range(number_of_new_channels):
+            trg = random.choices(list(log_degree_distribution.keys()),
+                                  weights=log_degree_distribution.values(), k=1)[0]
+            src = random.choices(list(inv_log_degree_distribution.keys()),
+                                  weights=inv_log_degree_distribution.values(), k=1)[0]
+            list_of_pairs.append((src, trg))
+
+        return list_of_pairs
+
+    
+    def add_edges(self, G, k): 
+        #TODO: we have to add edge feautres and update network dictionary
+        #(and maybe other places that get influenced by adding new channels) note that we have to
+        # change the features tha would change in the input of the GNN
+        list_of_pairs = self.fetch_new_pairs_for_create_new_channels(G, k)
+        fees = self.simulator.get_rates_and_bases(list_of_pairs)
+        self.simulator.update_evolved_graph(fees,list_of_pairs)
 
         
         # Calculate degree of each node
