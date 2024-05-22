@@ -5,6 +5,7 @@ import numpy as np
 import random
 import math
 from operator import itemgetter
+from littleballoffur import ForestFireSampler
 
 
 def aggregate_edges(directed_edges):
@@ -109,6 +110,16 @@ def get_snowball_neighbors(G, vertex, k):
     sampled_neighbors = random.sample(neighbors, min(k, len(neighbors)))
     
     return set(sampled_neighbors)
+
+
+def get_fire_forest_sample(G, sample_size, burning_prob = 0.7):
+    ForestFireSampler = ForestFireSampler(number_of_nodes = sample_size, p = burning_prob,
+                                    seed = 42, max_visited_nodes_backlog = 100, restart_hop_size = 10)
+    sampled_G = ForestFireSampler.sample(G)
+
+    return sampled_G
+    
+
     
 
 def initiate_balances(directed_edges, approach='half'):
@@ -232,6 +243,7 @@ def create_sampled_sub_node(G, src, local_heads_number, providers, local_size, s
     
     
     sub_nodes.update(snowball_sampling(G,random_base_nodes,stages=4,k=4, local_size=local_size))
+    
     if len(sub_nodes) < local_size:
         raise GraphTooSmallError()
 
