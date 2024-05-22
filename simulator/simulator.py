@@ -334,6 +334,29 @@ class simulator():
         if bal >= amount:
           graph.add_edge(trg,self.src,weight = base_fees[2*i]*1000 + fee_rates[2*i]*amount) # to turn fee base to mili msat multiply to 1000
           graph.add_edge(self.src,trg,weight = base_fees[2*i + 1]*1000 + fee_rates[2*i + 1]*amount) # to turn fee base to mili msat multiply to 1000
+  
+  def update_evolved_graph(self,fees,list_of_pairs):
+
+    list_of_balances = self.get_list_of_balances(self,list_of_pairs)
+    midpoint = len(fees) // 2
+    fee_rates = fees[:midpoint]
+    base_fees = fees[midpoint:]
+    #adding channels with weight to relevant amount graphs
+    for i in range(len(list_of_pairs)):
+      src, trg = list_of_pairs[i][0], list_of_pairs[i][1]
+      bal = list_of_balances[i]
+      for amount, graph in self.graphs_dict.items():
+        if bal >= amount:
+          graph.add_edge(trg,src,weight = base_fees[2*i]*1000 + fee_rates[2*i]*amount) # to turn fee base to mili msat multiply to 1000
+          graph.add_edge(src,trg,weight = base_fees[2*i + 1]*1000 + fee_rates[2*i + 1]*amount) # to turn fee base to mili msat multiply to 1000
+  
+  def get_list_of_balances(self,list_of_pairs): 
+     list_of_balances = []
+     #TODO: calculate a list of balances which create a list of balances which 
+     # element i represent the balance for a channel which a pair represents(the balance of both ways are equal)
+     # so each element represent a balance for each pair
+     return list_of_balances
+
 
 
   def preprocess_amount_graph(self,amount,action):
@@ -618,15 +641,27 @@ class simulator():
     return fee, rebalancing_type
   
   
-  def get_additive_channel_fees(self, additive_channels):
+  def get_additive_channel_fees(self, action):
     #NOTE: the approach taken is general sense approach, and for the peer, we use median approach
     bases = []
     rates = []
-    midpoint = len(additive_channels) // 2
-    additive_channels = additive_channels[:midpoint]
+    midpoint = len(action) // 2
+    additive_channels = action[:midpoint]
     for trg in additive_channels:
       base_neighbor, rate_neighbor = self.fee_policy[trg]
       base_src, rate_src = self.fee_policy[self.src]
       bases.extend([base_neighbor, base_src])
       rates.extend([rate_neighbor, rate_src])
     return rates + bases
+  
+  def get_rates_and_bases(self, list_of_pairs):
+      bases = []
+      rates = []
+      for i in range(0,len(list_of_pairs)):
+          src = list_of_pairs[i][0]
+          trg = list_of_pairs[i][1]
+          base_neighbor, rate_neighbor = self.fee_policy[trg]
+          base_src, rate_src = self.fee_policy[src]
+          bases.extend([base_neighbor, base_src])
+          rates.extend([rate_neighbor, rate_src])
+      return rates + bases
