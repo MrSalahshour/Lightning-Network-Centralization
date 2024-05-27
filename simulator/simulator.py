@@ -410,6 +410,7 @@ class simulator():
         elif result_bit == -1 : #failed transaction
             transactions.at[index,"result_bit"] = -1   
             transactions.at[index,"path"] = []
+        #TODO: you can add centrality approximation to node features here
       # print("random transactions ended succussfully!")
       return transactions    #contains final result bits  #contains paths
   

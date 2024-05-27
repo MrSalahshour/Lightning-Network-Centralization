@@ -478,7 +478,7 @@ class FeeEnv(gym.Env):
 
         network_dictionary, sub_providers, sub_edges, sub_graph = preprocessing.get_sub_graph_properties(self.LN_graph,sub_nodes,self.providers)
         
-        sub_graph = self.make_graph_weighted(sub_graph, amount = self.average_transaction_amounts)
+        # sub_graph = self.make_graph_weighted(sub_graph, amount = self.average_transaction_amounts)
 
         active_channels = preprocessing.create_active_channels(network_dictionary, [])
 

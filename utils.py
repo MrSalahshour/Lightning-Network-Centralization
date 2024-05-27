@@ -10,11 +10,14 @@ import pickle
 import graph_embedding_processing
 from sklearn.model_selection import train_test_split
 
+from model import Custom_policy
+
 
 def make_agent(env, algo, device, tb_log_dir):
     #NOTE: You must use `MultiInputPolicy` when working with dict observation space, not MlpPolicy
     # policy = "MlpPolicy"
-    policy = "MultiInputPolicy"
+    # policy = "MultiInputPolicy"
+    policy = Custom_policy
     # create model
     if algo == "PPO":
         from stable_baselines3 import PPO
@@ -52,8 +55,9 @@ def make_env(data, env_params, seed, eval_mode):
         env_params['epsilons']), "number of transaction types missmatch"
     
     directed_edges = preprocessing.get_directed_edges(env_params['data_path'])
+    providers = data['providers']
 
-    G = preprocessing.make_LN_graph(directed_edges, env_params['manual_balance'], data["src"]
+    G = preprocessing.make_LN_graph(directed_edges, providers, env_params['manual_balance'], data["src"]
     , data["trgs"], data["channel_ids"], env_params['capacities'], env_params['initial_balances'])
 
     # if eval_mode==True:

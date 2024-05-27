@@ -187,14 +187,27 @@ def create_active_channels(network_dictionary, channels):
         active_channels[(trg, src)] = network_dictionary[(trg, src)]
     return active_channels
 
-def make_LN_graph(directed_edges, manual_balance, src, trgs, channel_ids, capacities, initial_balances):
+def make_LN_graph(directed_edges, providers, manual_balance, src, trgs, channel_ids, capacities, initial_balances,):
     edges = initiate_balances(directed_edges)
     if manual_balance:
         edges = set_channels_balances(edges, src, trgs, channel_ids, capacities, initial_balances)
     G = nx.from_pandas_edgelist(edges, source="src", target="trg",
                                 edge_attr=['channel_id', 'capacity', 'fee_base_msat', 'fee_rate_milli_msat', 'balance'],
                                create_using=nx.DiGraph())
+    
+    #NOTE: the node features vector is as follows: [degree_centrality, closeness_centrality, eigenvectors_centrality, is_provider, is_connected_to_us, normalized_transaction_amount]
+    # degrees, closeness, eigenvectors = set_node_attributes(G)
+    providers_nodes = list(set(providers))
+    for i in range(len(G.nodes())):
+        G.nodes()[i] = np.array([0, 0, 0, G.nodes()[i] in providers_nodes, 0, 0])
     return G
+
+def set_node_attributes(G):
+    degrees = nx.degree_centrality(G,normalized=True)
+    closeness = nx.closeness_centrality(G,normalized=True)
+    eigenvectors = nx.eigenvector_centrality(G,normalized=True)
+    return degrees, closeness, eigenvectors
+    
 
 def create_sub_network(directed_edges, providers, src, trgs, channel_ids, local_size, local_heads_number, manual_balance=False, initial_balances = [], capacities=[]):
     """creating network_dictionary, edges and providers for the local subgraph."""
@@ -220,6 +233,11 @@ def get_sub_graph_properties(G,sub_nodes,providers):
 
     sub_providers = list(set(sub_nodes) & set(providers))
     sub_graph = G.subgraph(sub_nodes)
+    degrees, closeness, eigenvectors = set_node_attributes(G)
+    #set centrality of nodes
+    for i in range(len(G.nodes())):
+        G.nodes()[i][:3] = degrees[i], closeness[i], eigenvectors[i]
+        
     sub_edges = nx.to_pandas_edgelist(sub_graph)
     sub_edges = sub_edges.rename(columns={'source': 'src', 'target': 'trg'})    
     network_dictionary = create_network_dictionary(sub_edges)
