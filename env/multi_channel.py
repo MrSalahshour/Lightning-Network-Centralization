@@ -272,21 +272,24 @@ class FeeEnv(gym.Env):
         #     'transaction_amounts': self.transaction_amounts_list,
         #     'graph_embedding': self.graph_embedding
         # } 
-        self.current_graph = self.evolve_graph(self, number_of_new_channels)
+        #TODO: use balances and transaction amounts here for edeg and node attributes, calculate the centralities here. 
+        self.current_graph = self.evolve_graph(self, self.generate_number_of_new_channels(self.time_step))
 
         node_features, edge_index, edge_attr = self.extract_graph_attributes(self.current_graph, exclude_attributes=['capacity, channel_id'])
 
         self.state = {
+
         "node_features" : node_features,
         "edge_attr" : edge_attr,
         "edge_index": edge_index
+
         }
 
 
         return self.state, reward, done, info
     
-    def generate_number_of_new_channels(self, time_step):
-        
+    def generate_number_of_new_channels(time_step):
+        #TODO: generate the number of added channels base on time step
         return 7
 
     def simulate_transactions(self, action, additive_channels = None):
@@ -436,7 +439,7 @@ class FeeEnv(gym.Env):
         sampled_graph = preprocessing.get_fire_forest_sample(self.LN_graph,self.n_nodes)    
         return list(sampled_graph.nodes())
     
-    def evolve_graph(self, G, number_of_new_channels):
+    def evolve_graph(self, number_of_new_channels):
 
         transformed_graph = self.add_edges(self.current_graph, number_of_new_channels)
 
@@ -505,36 +508,6 @@ class FeeEnv(gym.Env):
 
         return G
     
-
-    def get_new_graph_embedding(self, G, embedding_mode):
-
-        if embedding_mode == 'feather':
-            if self.embedder == None:
-                self.embedder = graph_embedding_processing.get_feather_embedder()
-                model , graph_embedding = graph_embedding_processing.get_feather_embedding(self.embedder, G)
-                self.embedder = model
-            else:
-                model , graph_embedding = graph_embedding_processing.get_feather_embedding(self.embedder, G)
-                self.embedder = model
-
-            return graph_embedding
-        
-        elif embedding_mode == 'geo_scattering':
-            return graph_embedding_processing.get_geo_scattering_embedding(G)
-
-        elif embedding_mode == 'LDP':
-            return graph_embedding_processing.get_LDP_embedding(G)
-        
-        elif embedding_mode == 'GL2Vec':
-            return graph_embedding_processing.get_GL2Vec_embedding(G)
-
-        elif embedding_mode == 'Graph2Vec':
-            return graph_embedding_processing.get_Graph2Vec_embedding(G)
-
-        else:
-            print("Unknown embedding mode")
-        
-        return None
     
     # def make_graph_weighted(self,graph, amount):
         #weights  based on satoshi
@@ -551,6 +524,8 @@ class FeeEnv(gym.Env):
         sub_nodes = self.sample_graph_environment()
 
         network_dictionary, sub_providers, sub_edges, sub_graph = preprocessing.get_sub_graph_properties(self.LN_graph,sub_nodes,self.providers)
+
+        # adding these features in order: degree_centrality, closeness_centrality, eigenvectors_centrality, is_provider, is_connected_to_us, normalized_transaction_amount]
         
         # sub_graph = self.make_graph_weighted(sub_graph, amount = self.average_transaction_amounts)
 
