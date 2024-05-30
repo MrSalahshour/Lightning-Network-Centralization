@@ -202,7 +202,7 @@ def make_LN_graph(directed_edges, providers, manual_balance, src, trgs, channel_
         G.nodes()[i]["feature"] = np.array([0, 0, 0, G.nodes()[i] in providers_nodes, 0, 0])
     return G
 
-def set_node_attributes(G):
+def get_nodes_centralities(G):
     degrees = nx.degree_centrality(G,normalized=True)
     closeness = nx.closeness_centrality(G,normalized=True)
     eigenvectors = nx.eigenvector_centrality(G,normalized=True)
@@ -233,7 +233,7 @@ def get_sub_graph_properties(G,sub_nodes,providers):
 
     sub_providers = list(set(sub_nodes) & set(providers))
     sub_graph = G.subgraph(sub_nodes)
-    degrees, closeness, eigenvectors = set_node_attributes(G)
+    degrees, closeness, eigenvectors = get_nodes_centralities(G)
     #set centrality of nodes
     for i in range(len(G.nodes())):
         G.nodes()[i]["features"][:3] = degrees[i], closeness[i], eigenvectors[i]

@@ -19,7 +19,8 @@ class simulator():
                active_providers,
                fee_policy,
                fixed_transactions = True,
-               support_onchain_rebalancing = False):
+               support_onchain_rebalancing = False,
+               graph_nodes = None):
     
     self.mode = mode
     self.src = src
@@ -35,6 +36,10 @@ class simulator():
     self.network_dictionary = network_dictionary
     self.fixed_transactions = fixed_transactions
     self.support_onchain_rebalancing = support_onchain_rebalancing
+    self.graph_nodes = graph_nodes
+    
+    self.transaction_amounts = np.zeros(len(self.graph_nodes))
+    self.map_nodes_to_id = dict(zip(self.graph_nodes, np.arange(len(node_variables))))
 
 
     self.graphs_dict = self.generate_graphs_dict(transaction_types)
@@ -122,8 +127,6 @@ class simulator():
             graph.add_edge(trg, src, weight = self.calculate_weight(trg_src, amount))
 
           self.graphs_dict[amount] = graph
-            
-    
   
 
 
@@ -229,11 +232,12 @@ class simulator():
 
   def update_network_data(self, path, transaction_amount):
       for i in range(len(path)-1) :
-        src = path[i]
+        src = path[i] 
         trg = path[i+1]
         if (self.is_active_channel(src, trg)) :
           self.update_active_channels(src,trg,transaction_amount)
-        self.update_graphs(src, trg)
+        self.update_graphs(src, trg, transaction_amount)
+        self.transaction_amounts[self.map_nodes_to_id[src]] += transaction_amount
           
           
             
@@ -336,6 +340,8 @@ class simulator():
       for amount, graph in self.graphs_dict.items():
           graph.remove_edge(self.src,key)
           graph.remove_edge(key,self.src)
+          
+          self.graphs_dict[amount] = graph
       
     
     midpoint = len(fees) // 2
@@ -348,7 +354,8 @@ class simulator():
         if bal >= amount:
           graph.add_edge(trg,self.src,weight = base_fees[2*i]*1000 + fee_rates[2*i]*amount) # to turn fee base to mili msat multiply to 1000
           graph.add_edge(self.src,trg,weight = base_fees[2*i + 1]*1000 + fee_rates[2*i + 1]*amount) # to turn fee base to mili msat multiply to 1000
-  
+          
+          self.graphs_dict[amount] = graph
   def update_evolved_graph(self, fees, list_of_pairs):
 
     list_of_balances = self.get_list_of_balances(self, list_of_pairs)
@@ -364,6 +371,8 @@ class simulator():
         if bal >= amount:
           graph.add_edge(trg, src, weight = base_fees[2*i]*1000 + fee_rates[2*i]*amount) # to turn fee base to mili msat multiply to 1000
           graph.add_edge(src, trg, weight = base_fees[2*i + 1]*1000 + fee_rates[2*i + 1]*amount) # to turn fee base to mili msat multiply to 1000
+          
+          self.graphs_dict[amount] = graph
     return list_of_balances
   
   def get_list_of_balances(self, list_of_pairs): 

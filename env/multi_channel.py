@@ -484,9 +484,7 @@ class FeeEnv(gym.Env):
 
     
     def add_edges(self, G, k): 
-        #TODO: we have to add edge feautres and update network dictionary
-        #(and maybe other places that get influenced by adding new channels) note that we have to
-        # change the features that would change in the input of the GNN
+
         list_of_pairs = self.fetch_new_pairs_for_create_new_channels(G, k)
 
         fees = self.simulator.get_rates_and_bases(list_of_pairs)
@@ -508,16 +506,6 @@ class FeeEnv(gym.Env):
 
         return G
     
-    
-    # def make_graph_weighted(self,graph, amount):
-        #weights  based on satoshi
-        for u, v, data in graph.edges(data=True):
-            fee_rate = data.get('fee_rate_milli_msat', 0)
-            fee_base = data.get('fee_base_msat', 0)
-            weight = 1e-6 * (fee_rate * amount + fee_base *1000)
-            graph[u][v]['weight'] = weight
-            
-        return graph
         
     def set_new_graph_environment(self):
 
@@ -561,39 +549,12 @@ class FeeEnv(gym.Env):
                                    node_variables=self.data['node_variables'],
                                    active_providers=self.data['active_providers'],
                                    fee_policy = self.data["fee_policy"],
-                                   fixed_transactions=False)
+                                   fixed_transactions=False,
+                                   graph_nodes = self.graph_nodes)
         
         return sub_graph
-    
-    # one channel distruction would cost 10^7 msat
-    # def calculate_penalty(self,prev_action,action,channel_distruction_penalty = 10000):
-        midpoint = len(action)//2
-        # max_episode_to_get_real_penalty = 100000
-
-        # penalty = min(channel_distruction_penalty,self.time_step*channel_distruction_penalty/max_episode_to_get_real_penalty)
-        penalty = channel_distruction_penalty
-        # penalty = 0
-
-
-        diff_items = self.min_changes(prev_action[:midpoint], action[:midpoint])
-        self.total_channel_changes += diff_items
-
-        return diff_items * penalty
-
-    # def min_changes(self, list1, list2):
-        # Create multisets
-        multiset1 = Counter(list1)
-        multiset2 = Counter(list2)
-
-        # Find the difference between the two multisets
-        diff = multiset1 - multiset2
-
-        # The total number of changes is the sum of the differences
-        total_changes = sum(diff.values())
-
-        return total_changes
-    
-    def extract_graph_attributes(G, exclude_attributes=None):
+        
+    def extract_graph_attributes(self, G, exclude_attributes=None):
         """
         Extracts node features, edge indices, and edge attributes from a given graph `G`.
 
@@ -608,17 +569,35 @@ class FeeEnv(gym.Env):
                 - edge_attr (numpy.ndarray): A 2D array of edge attributes.
         """
         node_features = np.array([G.nodes[n]['feature'] for n in G.nodes])
-
+        degrees, closeness, eigenvectors = preprocessing.get_nodes_centralities(self.current_graph)
+        normalized_transaction_amounts = self.simulator.transaction_amounts/np.sum(self.simulator.transaction_amounts)
+        trgs = [self.simulator.map_nodes_to_id[x] for x in self.simulator.trgs]
+        
+        #set node features
+        for i in range(len(G.nodes())):
+            node_features[i][0] = degrees[i]
+            node_features[i][1] = closeness[i]
+            node_features[i][2] = eigenvectors[i]
+            node_features[i][4] = 0
+            if i in trgs:
+                node_features[i][4] = 1
+            node_features[i][5] = normalized_transaction_amounts[i]
         # Extract edge index
         edge_index = np.array(list(G.edges)).T
 
         # Extract multiple edge attributes (excluding specified attributes)
+        max_list = self.get_normalizer_configs()
         edge_attr_list = []
         for e in G.edges(data=True):
             filtered_attrs = {key: e[2][key] for key in e[2] if key not in exclude_attributes}
-            edge_attr_list.append(list(filtered_attrs.values()))
+            filtered_attrs = list(filtered_attrs.values())
+            edge_attr_list.append([filtered_attrs[i]/max_list[i] for i in range(len(max_list))])
         edge_attr = np.array(edge_attr_list)
 
         return node_features, edge_index, edge_attr
-    
 
+
+
+    def get_normalizer_configs(self,):
+        #return cap_max, base_max, rate_max
+        return 1000, 1000, 1000
