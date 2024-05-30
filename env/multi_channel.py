@@ -110,12 +110,27 @@ class FeeEnv(gym.Env):
         self.maximum_capacity = max_capacity
 
         self.action_space = spaces.MultiDiscrete([self.n_nodes for _ in range(self.n_channel)] + [capacity_upper_scale_bound for _ in range(self.n_channel)])
+        
 
-        self.observation_space = Dict({
-            'capacities': Box(low=0, high=capacity_upper_scale_bound, shape=(self.n_nodes,)),
-            'transaction_amounts': Box(low=0, high=np.inf, shape=(self.n_nodes,)),
-            'graph_embedding': Box(low=-np.inf, high=np.inf, shape=(self.embedding_size,))
+
+        num_node_features = len(next(iter(self.current_graph.nodes(data=True)))[1]['feature'])
+        num_edge_features = len(next(iter(self.current_graph.edges(data=True)))[2])
+        num_edges = len(self.current_graph.edges())
+        self.node_features_space = spaces.Box(low=0, high=1, shape=(self.n_nodes, num_node_features), dtype=np.float32)
+        self.edge_features_space = spaces.Box(low=0, high=1, shape=(num_edges, num_edge_features), dtype=np.float32)
+        self.edge_index_space = spaces.Box(low=0, high=self.n_nodes, shape=(2, num_edges), dtype=np.float32)
+        self.observation_space = spaces.Dict({
+            "node_features" : self.node_features_space,
+            "edge_attr" : self.edge_features_space,
+            "edge_index": self.edge_index_space
         })
+
+
+        # self.observation_space = Dict({
+        #     'capacities': Box(low=0, high=capacity_upper_scale_bound, shape=(self.n_nodes,)),
+        #     'transaction_amounts': Box(low=0, high=np.inf, shape=(self.n_nodes,)),
+        #     'graph_embedding': Box(low=-np.inf, high=np.inf, shape=(self.embedding_size,))
+        # })
 
         #NOTE: Initial values of each channel for fee selection mode
         # self.initial_balances = data['initial_balances']
@@ -123,12 +138,21 @@ class FeeEnv(gym.Env):
         # self.state = np.append(self.initial_balances, np.zeros(shape=(self.n_channel,)))
         
 
-        self.graph_embedding =self.get_new_graph_embedding(self.current_graph,self.embedding_mode)
+        # self.graph_embedding =self.get_new_graph_embedding(self.current_graph,self.embedding_mode)
 
+        # self.state = {
+        #     'capacities': np.zeros(self.n_nodes),
+        #     'transaction_amounts': np.zeros(self.n_nodes),
+        #     'graph_embedding': self.graph_embedding
+        # }
+        
+        node_features, edge_index, edge_attr = self.extract_graph_attributes(self.current_graph, exclude_attributes=['capacity, channel_id'])
+        
         self.state = {
-            'capacities': np.zeros(self.n_nodes),
-            'transaction_amounts': np.zeros(self.n_nodes),
-            'graph_embedding': self.graph_embedding
+
+            "node_features" : node_features,
+            "edge_attr" : edge_attr,
+            "edge_index": edge_index
         }
             
         self.time_step = 0
@@ -238,22 +262,47 @@ class FeeEnv(gym.Env):
         info = {'TimeLimit.truncated': True if self.time_step >= self.max_episode_length else False}
         done = self.time_step >= self.max_episode_length
 
-        capacities_list = np.zeros((self.n_nodes,))
+        # capacities_list = np.zeros((self.n_nodes,))
         
-        for idx, in range(midpoint):
-            capacities_list[raw_action[idx]] = raw_action[idx+midpoint]
-            self.transaction_amounts_list[raw_action[idx]] += transaction_amounts[idx]
-  
-        
+        # for idx, in range(midpoint):
+        #     capacities_list[raw_action[idx]] = raw_action[idx+midpoint]
+        #     self.transaction_amounts_list[raw_action[idx]] += transaction_amounts[idx]       
+        # self.state = {
+        #     'capacities': capacities_list,
+        #     'transaction_amounts': self.transaction_amounts_list,
+        #     'graph_embedding': self.graph_embedding
+        # } 
+        #TODO: use balances and transaction amounts here for edeg and node attributes, calculate the centralities here. 
+        self.current_graph = self.evolve_graph(self, self.generate_number_of_new_channels(self.time_step))
+
+        node_features, edge_index, edge_attr = self.extract_graph_attributes(self.current_graph, exclude_attributes=['capacity, channel_id'])
+
         self.state = {
-            'capacities': capacities_list,
-            'transaction_amounts': self.transaction_amounts_list,
-            'graph_embedding': self.graph_embedding
-        } 
+
+        "node_features" : node_features,
+        "edge_attr" : edge_attr,
+        "edge_index": edge_index
+
+        }
+
 
         return self.state, reward, done, info
+    
+    def generate_number_of_new_channels(time_step):
+        #TODO: generate the number of added channels base on time step
+        return 7
 
     def simulate_transactions(self, action, additive_channels = None):
+        """
+        Simulates transactions for the given action and additive channels.
+        
+        Args:
+            action (str): The action to simulate.
+            additive_channels (list, optional): A list of additive channels to include in the simulation.
+        
+        Returns:
+            tuple: A tuple containing the balances, transaction amounts, and transaction numbers resulting from the simulation.
+        """
         #NOTE: fees set in the step, now will be added to network_dict and active_channels
         self.simulator.set_channels_fees(self.mode,action,additive_channels[:len(additive_channels)//2])
 
@@ -274,26 +323,50 @@ class FeeEnv(gym.Env):
         else:
             self.prev_action = []
             self.current_graph = self.set_new_graph_environment()
-            self.graph_embedding = self.get_new_graph_embedding(self.current_graph,self.embedding_mode)
+            # self.graph_embedding = self.get_new_graph_embedding(self.current_graph,self.embedding_mode)
+            # self.state = {
+            #     'capacities': np.zeros(self.n_nodes),
+            #     'transaction_amounts': np.zeros(self.n_nodes),
+            #     'graph_embedding': self.graph_embedding #sample new embedding
+            # }
+            node_features, edge_index, edge_attr = self.extract_graph_attributes(self.current_graph, exclude_attributes=['capacity, channel_id'])
             self.state = {
-                'capacities': np.zeros(self.n_nodes),
-                'transaction_amounts': np.zeros(self.n_nodes),
-                'graph_embedding': self.graph_embedding #sample new embedding
+            "node_features" : node_features,
+            "edge_attr" : edge_attr,
+            "edge_index": edge_index
             }
             self.transaction_amounts_list = np.zeros((self.n_nodes,))
             return self.state 
-        
-    def is_weighted(self,G):
-        return all('weight' in G[u][v] for u, v in G.edges())
 
 
     def action_fix_index_to_capacity(self,capacities,action):
+        """
+        Fixes the index values in an action list to match the corresponding capacity values.
+        
+        Args:
+            capacities (list): A list of capacity values.
+            action (list): A list of graph node indices.
+        
+        Returns:
+            list: A new list with the graph node indices in the first half and the corresponding capacity values in the second half.
+        """
         midpoint = len(action) // 2
         fixed_action = [self.graph_nodes[i] for i in action[:midpoint]]
         fixed_action.extend([capacities[i] for i in action[midpoint:]])
         return fixed_action
     
     def map_action_to_capacity(self, action):
+        """
+        Maps an action to a list of target nodes and their corresponding capacities.
+        
+        The action is assumed to be a list where the first half represents the indices of the target nodes, and the second half represents the capacities for those targets.
+        
+        Args:
+            action (list): A list containing the indices of the target nodes and their corresponding capacities.
+        
+        Returns:
+            list: A list containing the target nodes and their corresponding capacities.
+        """
         midpoint = len(action) // 2
         fixed_action = []
         #seeting up trgs from their ind
@@ -303,10 +376,19 @@ class FeeEnv(gym.Env):
             fixed_action = softmax(np.array(action[midpoint:])) * self.maximum_capacity      
       
         return fixed_trgs+fixed_action.tolist()
-                
-            
     
     def aggregate_and_standardize_action(self,action):
+        """
+        Aggregates and standardizes the action values in the given action list.
+        
+        The action list is assumed to be a concatenation of node IDs and their corresponding action values. This function first identifies the unique nodes, then aggregates the action values for each node, and finally standardizes the aggregated action values by finding the greatest common divisor (GCD) of the values and dividing each value by the GCD.
+        
+        Args:
+            action (list): A list containing node IDs and their corresponding action values.
+        
+        Returns:
+            list: A list containing the unique nodes and their standardized action values.
+        """
         midpoint = len(action) // 2
         unique_nodes = list(set(action[:midpoint]))
         nonzero_unique_nodes = []
@@ -328,6 +410,15 @@ class FeeEnv(gym.Env):
         return nonzero_unique_nodes + action_bal
     
     def action_fix(action):
+        """
+        Extracts the connected node IDs and their corresponding capacities from an action.
+        
+        Args:
+            action (list): A list of values representing the capacities of connected nodes.
+        
+        Returns:
+            list: A list containing the connected node IDs and their corresponding capacities.
+        """
         connected_node_ids = []
         connected_node_capacities = []
         for i, val in enumerate(action):
@@ -341,14 +432,6 @@ class FeeEnv(gym.Env):
     def get_local_graph(self,scale):
         return self.current_graph
     
-    # def count_identical_items(self,list_of_sets):
-    #     n = len(list_of_sets)
-    #     identical_counts = [[0]*n for _ in range(n)]
-    #     for i in range(n):
-    #         for j in range(i+1, n):
-    #             identical_counts[i][j] = len(list_of_sets[i] & list_of_sets[j])
-    #             print("identical_count","i:",i,"j:",j,identical_counts[i][j])
-    #     return identical_counts
 
     def sample_graph_environment(self):
         
@@ -356,12 +439,25 @@ class FeeEnv(gym.Env):
         sampled_graph = preprocessing.get_fire_forest_sample(self.LN_graph,self.n_nodes)    
         return list(sampled_graph.nodes())
     
-    def evolve_graph(self, G, number_of_new_channels):
+    def evolve_graph(self, number_of_new_channels):
 
-        transformed_graph = self.add_edges(G, number_of_new_channels)
+        transformed_graph = self.add_edges(self.current_graph, number_of_new_channels)
 
         return transformed_graph
+    
     def fetch_new_pairs_for_create_new_channels(self, G, number_of_new_channels):
+        """
+        Fetches a list of (source, target) pairs for creating new channels in the network.
+        
+        The function generates a list of pairs based on the logarithmic degree distribution and the inverse logarithmic degree distribution of the nodes in the network. The number of pairs returned is equal to the `number_of_new_channels` parameter.
+        
+        Args:
+            G (networkx.Graph): The network graph.
+            number_of_new_channels (int): The number of new channels to create.
+        
+        Returns:
+            list of (str, str): A list of (source, target) pairs for the new channels.
+        """
         #Return a list of tuples containing (src,trg) pairs for each channel to be created.
         #[(src1,trg1), (src2,trg2),...]
         list_of_pairs = []
@@ -380,6 +476,8 @@ class FeeEnv(gym.Env):
                                   weights=log_degree_distribution.values(), k=1)[0]
             src = random.choices(list(inv_log_degree_distribution.keys()),
                                   weights=inv_log_degree_distribution.values(), k=1)[0]
+            if trg == src:
+                continue
             list_of_pairs.append((src, trg))
 
         return list_of_pairs
@@ -388,81 +486,30 @@ class FeeEnv(gym.Env):
     def add_edges(self, G, k): 
         #TODO: we have to add edge feautres and update network dictionary
         #(and maybe other places that get influenced by adding new channels) note that we have to
-        # change the features tha would change in the input of the GNN
+        # change the features that would change in the input of the GNN
         list_of_pairs = self.fetch_new_pairs_for_create_new_channels(G, k)
+
         fees = self.simulator.get_rates_and_bases(list_of_pairs)
-        self.simulator.update_evolved_graph(fees,list_of_pairs)
 
-        
-        # Calculate degree of each node
-        degrees = dict(G.degree())
-        
-        # Create a distribution based on logarithm of degree of nodes
-        log_degrees = np.log(np.array(list(degrees.values())) + 1)
-        distribution = log_degrees / np.sum(log_degrees)
-        
-        nodes = list(G.nodes())
-        for _ in range(k):
-            # Sample two nodes based on the distribution
-            node1, node2 = np.random.choice(nodes, size=2, replace=False, p=distribution)
+        list_of_balances = self.simulator.update_evolved_graph(fees, list_of_pairs)
 
-            
+        midpoint = len(fees) // 2
+
+        for ((src,trg), bal, fee_base_src, fee_base_trg, fee_rate_src, fee_rate_trg) in zip(list_of_pairs, 
+                                                                                            list_of_balances,
+                                                                                            fees[midpoint:][1::2], 
+                                                                                            fees[midpoint:][::2], 
+                                                                                            fees[:midpoint][1::2], 
+                                                                                            fees[:midpoint][::2]):            
             # Add edge if not already exists
-            if not G.has_edge(node1, node2):
-                G.add_edge(node1, node2)
-                G.add_edge(node2, node1)  # For directed graph, add both way edges
+            if not G.has_edge(src, trg):
+                G.add_edge(src, trg, capacity = 2*bal, fee_base_msat = fee_base_src , fee_rate_milli_msat = fee_rate_src , balance = bal)
+                G.add_edge(trg, src, capacity = 2*bal, fee_base_msat = fee_base_trg , fee_rate_milli_msat = fee_rate_trg, balance = bal) 
 
         return G
     
-
-    def count_unique_graphs(self, graphs):
-        """
-        Counts the number of unique graphs in a list of graphs.
-
-        Args:
-            graphs (list): A list of nx.Graph objects.
-
-        Returns:
-            int: The number of unique graphs in the list.
-        """
-
-        # Convert the list of graphs to a set to remove duplicates.
-        graph_set = set(graphs)
-
-        # Return the size of the set, which represents the number of unique graphs.
-        return len(graph_set)
-
-    def get_new_graph_embedding(self, G, embedding_mode):
-
-        if embedding_mode == 'feather':
-            if self.embedder == None:
-                self.embedder = graph_embedding_processing.get_feather_embedder()
-                model , graph_embedding = graph_embedding_processing.get_feather_embedding(self.embedder, G)
-                self.embedder = model
-            else:
-                model , graph_embedding = graph_embedding_processing.get_feather_embedding(self.embedder, G)
-                self.embedder = model
-
-            return graph_embedding
-        
-        elif embedding_mode == 'geo_scattering':
-            return graph_embedding_processing.get_geo_scattering_embedding(G)
-
-        elif embedding_mode == 'LDP':
-            return graph_embedding_processing.get_LDP_embedding(G)
-        
-        elif embedding_mode == 'GL2Vec':
-            return graph_embedding_processing.get_GL2Vec_embedding(G)
-
-        elif embedding_mode == 'Graph2Vec':
-            return graph_embedding_processing.get_Graph2Vec_embedding(G)
-
-        else:
-            print("Unknown embedding mode")
-        
-        return None
     
-    def make_graph_weighted(self,graph, amount):
+    # def make_graph_weighted(self,graph, amount):
         #weights  based on satoshi
         for u, v, data in graph.edges(data=True):
             fee_rate = data.get('fee_rate_milli_msat', 0)
@@ -477,6 +524,8 @@ class FeeEnv(gym.Env):
         sub_nodes = self.sample_graph_environment()
 
         network_dictionary, sub_providers, sub_edges, sub_graph = preprocessing.get_sub_graph_properties(self.LN_graph,sub_nodes,self.providers)
+
+        # adding these features in order: degree_centrality, closeness_centrality, eigenvectors_centrality, is_provider, is_connected_to_us, normalized_transaction_amount]
         
         # sub_graph = self.make_graph_weighted(sub_graph, amount = self.average_transaction_amounts)
 
@@ -517,7 +566,7 @@ class FeeEnv(gym.Env):
         return sub_graph
     
     # one channel distruction would cost 10^7 msat
-    def calculate_penalty(self,prev_action,action,channel_distruction_penalty = 10000):
+    # def calculate_penalty(self,prev_action,action,channel_distruction_penalty = 10000):
         midpoint = len(action)//2
         # max_episode_to_get_real_penalty = 100000
 
@@ -531,7 +580,7 @@ class FeeEnv(gym.Env):
 
         return diff_items * penalty
 
-    def min_changes(self, list1, list2):
+    # def min_changes(self, list1, list2):
         # Create multisets
         multiset1 = Counter(list1)
         multiset2 = Counter(list2)
@@ -543,5 +592,33 @@ class FeeEnv(gym.Env):
         total_changes = sum(diff.values())
 
         return total_changes
+    
+    def extract_graph_attributes(G, exclude_attributes=None):
+        """
+        Extracts node features, edge indices, and edge attributes from a given graph `G`.
+
+        Args:
+            G (networkx.Graph): The input graph.
+            exclude_attributes (list or None): List of attribute names to exclude (optional).
+
+        Returns:
+            tuple:
+                - node_features (numpy.ndarray): A 2D array of node features.
+                - edge_index (numpy.ndarray): A 2D array of edge indices.
+                - edge_attr (numpy.ndarray): A 2D array of edge attributes.
+        """
+        node_features = np.array([G.nodes[n]['feature'] for n in G.nodes])
+
+        # Extract edge index
+        edge_index = np.array(list(G.edges)).T
+
+        # Extract multiple edge attributes (excluding specified attributes)
+        edge_attr_list = []
+        for e in G.edges(data=True):
+            filtered_attrs = {key: e[2][key] for key in e[2] if key not in exclude_attributes}
+            edge_attr_list.append(list(filtered_attrs.values()))
+        edge_attr = np.array(edge_attr_list)
+
+        return node_features, edge_index, edge_attr
     
 
