@@ -9,7 +9,7 @@ import os
 import pickle
 import graph_embedding_processing
 from sklearn.model_selection import train_test_split
-
+from model.GATv2_feature_extractor import CustomGATv2Extractor
 from model import Custom_policy
 
 
@@ -21,7 +21,14 @@ def make_agent(env, algo, device, tb_log_dir):
     # create model
     if algo == "PPO":
         from stable_baselines3 import PPO
-        model = PPO(policy, env, verbose=1, device=device, tensorboard_log=tb_log_dir)
+        # Create the custom policy
+        policy_kwargs = dict(
+            features_extractor_class=CustomGATv2Extractor,
+            features_extractor_kwargs=dict(features_dim=128),
+        )
+        # Instantiate the PPO agent with the custom policy
+        model = PPO('MlpPolicy', env, policy_kwargs=policy_kwargs, verbose=1)
+        # model = PPO(policy, env, verbose=1, device=device, tensorboard_log=tb_log_dir)
     elif algo == "TRPO":
         from sb3_contrib import TRPO
         model = TRPO(policy, env, verbose=1, device=device, tensorboard_log=tb_log_dir)
