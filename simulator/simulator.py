@@ -97,25 +97,29 @@ class simulator():
     return graph_dicts
 
 
-  #NOTE: why are just active channels updated in the amount graphs
-  def update_graphs(self, src, trg):
+  #NOTE: why are just active channels updated in the amount graphs,\
+    #it was not plausible, so we changed it :)
+  def update_graphs(self, src, trg, transaction_amount):
+      src_trg = self.network_dictionary[(src,trg)]
+      src_trg_balance = src_trg[0] - transaction_amount
+      self.network_dictionary[(src,trg)][0] = src_trg_balance
+      
+      trg_src = self.network_dictionary[(trg,src)]
+      trg_src_balance = trg_src[0] + transaction_amount
+      self.network_dictionary[(trg,src)][0] = trg_src_balance
+      
       for (count,amount,epsilon) in self.transaction_types:
           graph = self.graphs_dict[amount]  
-          if self.is_active_channel(src,trg):
-              src_trg = self.active_channels[(src,trg)]
-              src_trg_balance = src_trg[0]
-              trg_src = self.active_channels[(trg,src)]
-              trg_src_balance = trg_src[0]
-              
-              if (src_trg_balance <= amount) and (graph.has_edge(src, trg)):
-                graph.remove_edge(src, trg)
-              elif (src_trg_balance > amount) and (not graph.has_edge(src,trg)): 
-                graph.add_edge(src, trg, weight = self.calculate_weight(src_trg, amount))
-              
-              if (trg_src_balance <= amount) and (graph.has_edge(trg,src)):
-                graph.remove_edge(trg, src)
-              elif (trg_src_balance > amount) and (not graph.has_edge(trg,src)): 
-                graph.add_edge(trg, src, weight = self.calculate_weight(trg_src, amount))
+          
+          if (src_trg_balance <= amount) and (graph.has_edge(src, trg)):
+            graph.remove_edge(src, trg)
+          elif (src_trg_balance > amount) and (not graph.has_edge(src,trg)): 
+            graph.add_edge(src, trg, weight = self.calculate_weight(src_trg, amount))
+          
+          if (trg_src_balance <= amount) and (graph.has_edge(trg,src)):
+            graph.remove_edge(trg, src)
+          elif (trg_src_balance > amount) and (not graph.has_edge(trg,src)): 
+            graph.add_edge(trg, src, weight = self.calculate_weight(trg_src, amount))
 
           self.graphs_dict[amount] = graph
             
@@ -135,18 +139,23 @@ class simulator():
     return additive_channels, omitting_channels
   
   def delete_previous_action_differences(self, action, prev_action):
-
-
-    '''
-    In this function, channels of new action will be omited from the network iff they are old channels
-    with new assigned capacities or 0 capacity.
-    '''
+    """
+    Deletes the differences between the previous action and the current action.
+    
+    Args:
+        action (list): The current action.
+        prev_action (list): The previous action.
+    
+    Returns:
+        tuple: A tuple containing two lists:
+            - The additive targets and balances in the current action.
+            - The channels that need to be omitted.
+    """
     
     midpoint_prev_action = len(prev_action) // 2
     if midpoint_prev_action == 0:
       return action, []
     
-    # budget = 0
     midpoint_action = len(action) // 2
     additive_trgs = []
     additive_bal = []
@@ -181,10 +190,15 @@ class simulator():
     
   # Complementary
   def add_to_network_and_active_channels(self, additive_channels):
-    '''
-    In this function, channels of new action will be added to the network iff they are new channels
-    or have new capacities assigned.
-    '''
+    """
+    Adds the provided additive channels to the network dictionary and active channels dictionary.
+    
+    Args:
+        additive_channels (list): A list of tuples, where each tuple contains the target channel and the balance for that channel.
+    
+    Returns:
+        int: The number of channels added to the network and active channels dictionaries.
+    """
     if not additive_channels:
       return 0
     
@@ -219,7 +233,7 @@ class simulator():
         trg = path[i+1]
         if (self.is_active_channel(src, trg)) :
           self.update_active_channels(src,trg,transaction_amount)
-          self.update_graphs(src, trg)
+        self.update_graphs(src, trg)
           
           
             
@@ -312,7 +326,7 @@ class simulator():
     return path, result_bit, info 
   
   #TODO: #20 edges should be added to and deleted from digraph
-  def update_amount_graph(self,additive_channels,omitting_channels,fees):
+  def update_amount_graph(self, additive_channels, omitting_channels, fees):
     midpoint = len(additive_channels) // 2
     additive_trg = additive_channels[:midpoint]
     additive_bal = additive_channels[midpoint:]
@@ -335,9 +349,10 @@ class simulator():
           graph.add_edge(trg,self.src,weight = base_fees[2*i]*1000 + fee_rates[2*i]*amount) # to turn fee base to mili msat multiply to 1000
           graph.add_edge(self.src,trg,weight = base_fees[2*i + 1]*1000 + fee_rates[2*i + 1]*amount) # to turn fee base to mili msat multiply to 1000
   
-  def update_evolved_graph(self,fees,list_of_pairs):
+  def update_evolved_graph(self, fees, list_of_pairs):
 
-    list_of_balances = self.get_list_of_balances(self,list_of_pairs)
+    list_of_balances = self.get_list_of_balances(self, list_of_pairs)
+
     midpoint = len(fees) // 2
     fee_rates = fees[:midpoint]
     base_fees = fees[midpoint:]
@@ -347,15 +362,42 @@ class simulator():
       bal = list_of_balances[i]
       for amount, graph in self.graphs_dict.items():
         if bal >= amount:
-          graph.add_edge(trg,src,weight = base_fees[2*i]*1000 + fee_rates[2*i]*amount) # to turn fee base to mili msat multiply to 1000
-          graph.add_edge(src,trg,weight = base_fees[2*i + 1]*1000 + fee_rates[2*i + 1]*amount) # to turn fee base to mili msat multiply to 1000
+          graph.add_edge(trg, src, weight = base_fees[2*i]*1000 + fee_rates[2*i]*amount) # to turn fee base to mili msat multiply to 1000
+          graph.add_edge(src, trg, weight = base_fees[2*i + 1]*1000 + fee_rates[2*i + 1]*amount) # to turn fee base to mili msat multiply to 1000
+    return list_of_balances
   
-  def get_list_of_balances(self,list_of_pairs): 
+  def get_list_of_balances(self, list_of_pairs): 
+     """
+     Calculates a list of balances for a given list of pairs.
+     
+     Args:
+         list_of_pairs (list): A list of pairs, where each pair is a tuple of two strings.
+     
+     Returns:
+         list: A list of balances, where each balance is a float representing the mean capacity for the corresponding source in the input list, divided by 2.
+     """
      list_of_balances = []
-     #TODO: calculate a list of balances which create a list of balances which 
-     # element i represent the balance for a channel which a pair represents(the balance of both ways are equal)
-     # so each element represent a balance for each pair
+     for i in range(len(list_of_pairs)):
+        src = list_of_pairs[i][0]
+        mean = self.calculate_mean_capacity_for_src(self.network_dictionary, src)/2
+        list_of_balances.append(mean)
      return list_of_balances
+  
+  def calculate_mean_capacity_for_src(network_dict, src):
+    """
+    Calculates the mean capacity for a given source node in the network dictionary.
+    
+    Args:
+        network_dict (dict): A dictionary representing the network, where the keys are tuples of (source, destination) nodes, and the values are lists containing various network metrics.
+        src (str): The source node for which to calculate the mean capacity.
+    
+    Returns:
+        float: The mean capacity for the given source node, or 0 if there are no values available.
+    """
+    filtered_values = [val[3] for key, val in network_dict.items() if key[0] == src]
+    mean_value = sum(filtered_values) / len(filtered_values) if len(filtered_values) > 0 else 0
+    return mean_value
+
 
 
 
@@ -643,6 +685,17 @@ class simulator():
   
   
   def get_additive_channel_fees(self, action):
+    """
+    Calculates the additive channel fees for a given action.
+    
+    The approach taken is a general sense approach, and for the peer, a median approach is used.
+    
+    Args:
+        action (list): The action for which to calculate the additive channel fees.
+    
+    Returns:
+        list: The additive channel fees, including the base and rate for each channel.
+    """
     #NOTE: the approach taken is general sense approach, and for the peer, we use median approach
     bases = []
     rates = []
