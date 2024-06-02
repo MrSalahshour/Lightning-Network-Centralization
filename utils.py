@@ -10,6 +10,7 @@ import pickle
 import graph_embedding_processing
 from sklearn.model_selection import train_test_split
 from model.GATv2_feature_extractor import CustomGATv2Extractor
+from models import MyCustomDictRolloutBuffer
 
 
 def make_agent(env, algo, device, tb_log_dir):
@@ -26,7 +27,7 @@ def make_agent(env, algo, device, tb_log_dir):
             features_extractor_kwargs=dict(features_dim=64),
         )
         # Instantiate the PPO agent with the custom policy
-        model = PPO(policy, env, policy_kwargs=policy_kwargs, verbose=1)
+        model = PPO(policy, env, rollout_buffer_class = MyCustomDictRolloutBuffer, policy_kwargs=policy_kwargs, verbose=1)
         # model = PPO(policy, env, verbose=1, device=device, tensorboard_log=tb_log_dir)
     elif algo == "TRPO":
         from sb3_contrib import TRPO
