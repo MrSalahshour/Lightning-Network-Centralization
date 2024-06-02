@@ -41,7 +41,6 @@ class simulator():
     self.transaction_amounts = np.zeros(len(self.graph_nodes))
     self.map_nodes_to_id = dict(zip(self.graph_nodes, np.arange(len(node_variables))))
 
-
     self.graphs_dict = self.generate_graphs_dict(transaction_types)
 
     if fixed_transactions : 
@@ -214,6 +213,12 @@ class simulator():
       self.active_channels[(self.src, trg)] = self.network_dictionary[(self.src, trg)]
       self.active_channels[(trg, self.src)] = self.network_dictionary[(trg, self.src)]
       
+  def evolve_network_dict(self, src, trg, fee_base_src, fee_rate_src,fee_base_trg,fee_rate_trg, bal):
+     self.network_dictionary[(src, trg)] = [2*bal, fee_base_src, fee_rate_src, bal]
+     self.network_dictionary[(trg, src)] = [2*bal, fee_base_trg, fee_rate_trg, bal]
+
+     self.active_channels[(src, trg)] = self.network_dictionary[(src, trg)]
+     self.active_channels[(trg, src)] = self.network_dictionary[(trg, src)]     
       
 
 
@@ -237,10 +242,8 @@ class simulator():
         if (self.is_active_channel(src, trg)) :
           self.update_active_channels(src,trg,transaction_amount)
         self.update_graphs(src, trg, transaction_amount)
-        self.transaction_amounts[self.map_nodes_to_id[src]] += transaction_amount
-          
-          
-            
+        if src != self.src:
+          self.transaction_amounts[self.map_nodes_to_id[src]] += transaction_amount
       
   def is_active_channel(self, src, trg):
     return ((src,trg) in self.active_channels)
@@ -358,7 +361,7 @@ class simulator():
           self.graphs_dict[amount] = graph
   def update_evolved_graph(self, fees, list_of_pairs):
 
-    list_of_balances = self.get_list_of_balances(self, list_of_pairs)
+    list_of_balances = self.get_list_of_balances(list_of_pairs)
 
     midpoint = len(fees) // 2
     fee_rates = fees[:midpoint]
@@ -392,7 +395,7 @@ class simulator():
         list_of_balances.append(mean)
      return list_of_balances
   
-  def calculate_mean_capacity_for_src(network_dict, src):
+  def calculate_mean_capacity_for_src(self, network_dict, src):
     """
     Calculates the mean capacity for a given source node in the network dictionary.
     

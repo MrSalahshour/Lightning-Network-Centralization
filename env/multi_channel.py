@@ -68,29 +68,32 @@ class FeeEnv(gym.Env):
                   number_of_transaction_types, counts, amounts, epsilons, capacity_upper_scale_bound,
                     seed, LN_graph):
         # Source node\
-        self.embedder = None
-        self.total_channel_changes = 0
-        self.LN_graph = LN_graph
+        
         self.data = data
-        self.prev_action = []
-        self.providers = data['providers']
         self.src = self.data['src']
-        self.n_channel = data['n_channels']
-        self.average_transaction_amounts =  amounts[1]
+        self.LN_graph = LN_graph
+        self.providers = data['providers']
+        self.mode = mode
         self.transaction_types = generate_transaction_types(number_of_transaction_types, counts, amounts,
                                                        epsilons)
-        self.mode = mode
         self.current_graph = self.set_new_graph_environment()
+        self.n_nodes = len(self.data['nodes'])
         
-        self.n_nodes = len(self.data['nodes']) - 1 # nodes should be minus one to not include our node
+        
+        self.prev_action = []
+        
+        
+        self.n_channel = data['n_channels']
+        
+        
+        
+         # nodes should be minus one to not include our node
        
         print("number of nodes: ",self.n_nodes)
         self.graph_nodes = list(self.data['nodes'])
         if self.src in self.graph_nodes:
             self.graph_nodes.remove(self.src)
         
-        self.embedding_mode = "feather"
-        self.embedding_size = 108
         print('action dim:', self.n_nodes)
         
 
@@ -112,9 +115,13 @@ class FeeEnv(gym.Env):
         self.action_space = spaces.MultiDiscrete([self.n_nodes for _ in range(self.n_channel)] + [capacity_upper_scale_bound for _ in range(self.n_channel)])
         
 
-
+        
         num_node_features = len(next(iter(self.current_graph.nodes(data=True)))[1]['feature'])
-        num_edge_features = len(next(iter(self.current_graph.edges(data=True)))[2])
+        num_edge_features = len(next(iter(self.current_graph.edges(data=True)))[2]) - 2
+
+        print("num_node_features:",num_node_features)
+        print("num_edge_features:",num_edge_features)
+
         num_edges = len(self.current_graph.edges())
         self.node_features_space = spaces.Box(low=0, high=1, shape=(self.n_nodes, num_node_features), dtype=np.float32)
         self.edge_features_space = spaces.Box(low=0, high=1, shape=(num_edges, num_edge_features), dtype=np.float32)
@@ -217,8 +224,8 @@ class FeeEnv(gym.Env):
     def step(self, action):
         
         action = self.aggregate_and_standardize_action(action)
+        print("src:",self.src)
                 
-        raw_action = action.copy()
         
         if self.time_step%100==0:
             print("action: ",action,"time step: ",self.time_step)
@@ -273,7 +280,7 @@ class FeeEnv(gym.Env):
         #     'graph_embedding': self.graph_embedding
         # } 
         #TODO: use balances and transaction amounts here for edeg and node attributes, calculate the centralities here. 
-        self.current_graph = self.evolve_graph(self, self.generate_number_of_new_channels(self.time_step))
+        self.current_graph = self.evolve_graph()
 
         node_features, edge_index, edge_attr = self.extract_graph_attributes(self.current_graph, exclude_attributes=['capacity, channel_id'])
 
@@ -284,11 +291,12 @@ class FeeEnv(gym.Env):
         "edge_index": edge_index
 
         }
+        
 
 
         return self.state, reward, done, info
     
-    def generate_number_of_new_channels(time_step):
+    def generate_number_of_new_channels(self, time_step):
         #TODO: generate the number of added channels base on time step
         return 7
 
@@ -434,12 +442,13 @@ class FeeEnv(gym.Env):
     
 
     def sample_graph_environment(self):
-        
+        #TODO: this should not be set manually and should get pramaeter but can't use self.data['nodes']
         random.seed()
-        sampled_graph = preprocessing.get_fire_forest_sample(self.LN_graph,self.n_nodes)    
+        sampled_graph = preprocessing.get_fire_forest_sample(self.LN_graph, 100)    
         return list(sampled_graph.nodes())
     
-    def evolve_graph(self, number_of_new_channels):
+    def evolve_graph(self):
+        number_of_new_channels = self.generate_number_of_new_channels(self.time_step)
 
         transformed_graph = self.add_edges(self.current_graph, number_of_new_channels)
 
@@ -503,6 +512,7 @@ class FeeEnv(gym.Env):
             if not G.has_edge(src, trg):
                 G.add_edge(src, trg, capacity = 2*bal, fee_base_msat = fee_base_src , fee_rate_milli_msat = fee_rate_src , balance = bal)
                 G.add_edge(trg, src, capacity = 2*bal, fee_base_msat = fee_base_trg , fee_rate_milli_msat = fee_rate_trg, balance = bal) 
+                self.simulator.evolve_network_dict(src, trg, fee_base_src, fee_rate_src,fee_base_trg,fee_rate_trg, bal)
 
         return G
     
@@ -513,7 +523,7 @@ class FeeEnv(gym.Env):
 
         network_dictionary, sub_providers, sub_edges, sub_graph = preprocessing.get_sub_graph_properties(self.LN_graph,sub_nodes,self.providers)
 
-        # adding these features in order: degree_centrality, closeness_centrality, eigenvectors_centrality, is_provider, is_connected_to_us, normalized_transaction_amount]
+        # adding these features in order: degree_centrality, eigenvectors_centrality, is_provider, is_connected_to_us, normalized_transaction_amount]
         
         # sub_graph = self.make_graph_weighted(sub_graph, amount = self.average_transaction_amounts)
 
@@ -552,6 +562,8 @@ class FeeEnv(gym.Env):
                                    fixed_transactions=False,
                                    graph_nodes = self.graph_nodes)
         
+        print("DONE WITH SET NEW GRAPH ENV")
+        
         return sub_graph
         
     def extract_graph_attributes(self, G, exclude_attributes=None):
@@ -568,22 +580,28 @@ class FeeEnv(gym.Env):
                 - edge_index (numpy.ndarray): A 2D array of edge indices.
                 - edge_attr (numpy.ndarray): A 2D array of edge attributes.
         """
-        node_features = np.array([G.nodes[n]['feature'] for n in G.nodes])
-        degrees, closeness, eigenvectors = preprocessing.get_nodes_centralities(self.current_graph)
-        normalized_transaction_amounts = self.simulator.transaction_amounts/np.sum(self.simulator.transaction_amounts)
+
+        node_features = np.array([G.nodes[n]['feature'] for n in G.nodes]).astype(np.float32)
+        degrees, eigenvectors = preprocessing.get_nodes_centralities(self.current_graph)
+        if np.max(self.simulator.transaction_amounts) == 0:
+            normalized_transaction_amounts = np.zeros_like(self.simulator.transaction_amounts)
+        else:
+            normalized_transaction_amounts = self.simulator.transaction_amounts / np.sum(self.simulator.transaction_amounts)
         trgs = [self.simulator.map_nodes_to_id[x] for x in self.simulator.trgs]
-        
+  
         #set node features
+        nodes_list = list(G.nodes())
         for i in range(len(G.nodes())):
-            node_features[i][0] = degrees[i]
-            node_features[i][1] = closeness[i]
-            node_features[i][2] = eigenvectors[i]
-            node_features[i][4] = 0
+            node_features[i][0] = degrees[nodes_list[i]]
+            node_features[i][1] = eigenvectors[nodes_list[i]]
+            node_features[i][3] = 0
             if i in trgs:
-                node_features[i][4] = 1
-            node_features[i][5] = normalized_transaction_amounts[i]
+                node_features[i][3] = 1
+            node_features[i][4] = normalized_transaction_amounts[i]
+        
         # Extract edge index
-        edge_index = np.array(list(G.edges)).T
+        edge_index = np.array([(self.simulator.map_nodes_to_id[x],self.simulator.map_nodes_to_id[y]) for (x,y) in G.edges]).T
+
 
         # Extract multiple edge attributes (excluding specified attributes)
         max_list = self.get_normalizer_configs()
@@ -600,4 +618,4 @@ class FeeEnv(gym.Env):
 
     def get_normalizer_configs(self,):
         #return cap_max, base_max, rate_max
-        return 1000, 1000, 1000
+        return 10000000, 10000000, 10000000

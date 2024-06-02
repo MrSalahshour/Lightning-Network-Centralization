@@ -6,7 +6,7 @@ import random
 import math
 from operator import itemgetter
 from littleballoffur import ForestFireSampler
-
+from collections import deque
 
 def aggregate_edges(directed_edges):
     """aggregating multiedges"""
@@ -112,12 +112,128 @@ def get_snowball_neighbors(G, vertex, k):
     return set(sampled_neighbors)
 
 
-def get_fire_forest_sample(G, sample_size, burning_prob = 0.7):
-    ForestFireSampler = ForestFireSampler(number_of_nodes = sample_size, p = burning_prob,
-                                    seed = 42, max_visited_nodes_backlog = 100, restart_hop_size = 10)
-    sampled_G = ForestFireSampler.sample(G)
+def get_fire_forest_sample(G, sample_size, burning_prob=0.7):
+    # Step 1: Convert the directed graph to an undirected graph
+    undirected_G = nx.Graph()
+    
+    # Adding edges and attributes to the undirected graph, avoiding duplicates
+    for u, v, data in G.edges(data=True):
+        if not undirected_G.has_edge(u, v):
+            undirected_G.add_edge(u, v, **data)
+    
+    # Adding node attributes
+    for node, data in G.nodes(data=True):
+        undirected_G.nodes[node].update(data)
+    
+    # # Print part of the original graph nodes and attributes
+    # print("Original Graph Nodes and Attributes (Sample):")
+    # print(dict(list(G.nodes(data=True))[:10]))
+    
+    # Reindex nodes to be numeric
+    mapping = {node: i for i, node in enumerate(undirected_G.nodes())}
+    numeric_undirected_G = nx.relabel_nodes(undirected_G, mapping)
+    
+    # # Print part of the mapping
+    # print("Node Mapping (Original -> Numeric) (Sample):")
+    # print(dict(list(mapping.items())[:10]))
+    
+    # Adding node attributes to the numeric graph
+    for node, data in undirected_G.nodes(data=True):
+        numeric_undirected_G.nodes[mapping[node]].update(data)
+    
+    # # Print part of the numeric graph nodes and attributes
+    # print("Numeric Graph Nodes and Attributes (Sample):")
+    # print(dict(list(numeric_undirected_G.nodes(data=True))[:10]))
+    
+    # Step 2: Apply the ForestFireSampler to the undirected graph
+    forestFireSampler = ForestFireSampler(number_of_nodes=sample_size, p=burning_prob,
+                                          seed=42, max_visited_nodes_backlog=100, restart_hop_size=10)
+    
+    # Wrapper around the sample method
+    def wrapped_sample(graph):
+        def modified_start_a_fire(graph):
+            remaining_nodes = list(forestFireSampler._set_of_nodes.difference(forestFireSampler._sampled_nodes))
+            seed_node = random.choice(remaining_nodes)
+            forestFireSampler._sampled_nodes.add(seed_node)
+            node_queue = deque([seed_node])
+            while len(forestFireSampler._sampled_nodes) < forestFireSampler.number_of_nodes:
+                if len(node_queue) == 0:
+                    node_queue = deque(
+                        [
+                            forestFireSampler._visited_nodes.popleft()
+                            for k in range(
+                                min(forestFireSampler.restart_hop_size, len(forestFireSampler._visited_nodes))
+                            )
+                        ]
+                    )
+                    if len(node_queue) == 0:
+                        print(
+                            "Warning: could not collect the required number of nodes. The fire could not find enough nodes to burn."
+                        )
+                        break
+                top_node = node_queue.popleft()
+                forestFireSampler._sampled_nodes.add(top_node)
+                neighbors = set(forestFireSampler.backend.get_neighbors(graph, top_node))
+                unvisited_neighbors = neighbors.difference(forestFireSampler._sampled_nodes)
+                score = np.random.geometric(forestFireSampler.p)
+                count = min(len(unvisited_neighbors), score)
+                burned_neighbors = random.sample(list(unvisited_neighbors), count)  # Convert to list here
+                forestFireSampler._visited_nodes.extendleft(
+                    unvisited_neighbors.difference(set(burned_neighbors))
+                )
+                for neighbor in burned_neighbors:
+                    if len(forestFireSampler._sampled_nodes) >= forestFireSampler.number_of_nodes:
+                        break
+                    node_queue.extend([neighbor])
+        
+        # Override the _start_a_fire method
+        forestFireSampler._start_a_fire = modified_start_a_fire
+        return forestFireSampler.sample(graph)
+    
+    sampled_numeric_undirected_G = wrapped_sample(numeric_undirected_G)
+    
+    # # Print part of the sampled numeric graph nodes and attributes
+    # print("Sampled Numeric Graph Nodes and Attributes (Sample):")
+    # print(dict(list(sampled_numeric_undirected_G.nodes(data=True))[:10]))
+    
+    # Map back to original node labels
+    reverse_mapping = {i: node for node, i in mapping.items()}
+    sampled_undirected_G = nx.relabel_nodes(sampled_numeric_undirected_G, reverse_mapping)
+    
+    # # Print part of the reverse mapping
+    # print("Node Reverse Mapping (Numeric -> Original) (Sample):")
+    # print(dict(list(reverse_mapping.items())[:10]))
+    
+    # Step 3: Convert the sampled undirected graph back to a directed graph
+    sampled_directed_G = nx.DiGraph()
 
-    return sampled_G
+    for u, v, data in sampled_undirected_G.edges(data=True):
+        if G.has_edge(u, v):
+            sampled_directed_G.add_edge(u, v, **G[u][v])
+        if G.has_edge(v, u):
+            sampled_directed_G.add_edge(v, u, **G[v][u])
+    
+    # Adding node attributes to the sampled directed graph
+    for node, data in sampled_undirected_G.nodes(data=True):
+        sampled_directed_G.nodes[node].update(data)
+    
+    # # Verification step: Check if edge attributes are preserved
+    # print("Verifying edge attributes preservation:")
+    # for u, v in list(sampled_directed_G.edges())[:10]:  # Sample 10 edges for verification
+    #     original_data_uv = G.get_edge_data(u, v)
+    #     sampled_data_uv = sampled_directed_G.get_edge_data(u, v)
+    #     if original_data_uv != sampled_data_uv:
+    #         print(f"Mismatch for edge ({u}, {v}):")
+    #         print(f"  Original: {original_data_uv}")
+    #         print(f"  Sampled: {sampled_data_uv}")
+    #     else:
+    #         print(f"Edge ({u}, {v}) attributes match.")
+
+    # # Print part of the final sampled directed graph nodes and attributes
+    # print("Final Sampled Directed Graph Nodes and Attributes (Sample):")
+    # print(dict(list(sampled_directed_G.nodes(data=True))[:10]))
+    
+    return sampled_directed_G
     
 
     
@@ -195,18 +311,17 @@ def make_LN_graph(directed_edges, providers, manual_balance, src, trgs, channel_
                                 edge_attr=['channel_id', 'capacity', 'fee_base_msat', 'fee_rate_milli_msat', 'balance'],
                                create_using=nx.DiGraph())
     
-    #NOTE: the node features vector is as follows: [degree_centrality, closeness_centrality, eigenvectors_centrality, is_provider, is_connected_to_us, normalized_transaction_amount]
+    #NOTE: the node features vector is as follows: [degree_centrality, eigenvectors_centrality, is_provider, is_connected_to_us, normalized_transaction_amount]
     # degrees, closeness, eigenvectors = set_node_attributes(G)
     providers_nodes = list(set(providers))
-    for i in range(len(G.nodes())):
-        G.nodes()[i]["feature"] = np.array([0, 0, 0, G.nodes()[i] in providers_nodes, 0, 0])
+    for node in G.nodes():
+        G.nodes[node]["feature"] = np.array([0, 0, node in providers_nodes, 0, 0])
     return G
 
 def get_nodes_centralities(G):
-    degrees = nx.degree_centrality(G,normalized=True)
-    closeness = nx.closeness_centrality(G,normalized=True)
-    eigenvectors = nx.eigenvector_centrality(G,normalized=True)
-    return degrees, closeness, eigenvectors
+    degrees = nx.degree_centrality(G)
+    eigenvectors = nx.eigenvector_centrality(G)
+    return degrees, eigenvectors
     
 
 def create_sub_network(directed_edges, providers, src, trgs, channel_ids, local_size, local_heads_number, manual_balance=False, initial_balances = [], capacities=[]):
@@ -232,11 +347,11 @@ def create_sub_network(directed_edges, providers, src, trgs, channel_ids, local_
 def get_sub_graph_properties(G,sub_nodes,providers):
 
     sub_providers = list(set(sub_nodes) & set(providers))
-    sub_graph = G.subgraph(sub_nodes)
-    degrees, closeness, eigenvectors = get_nodes_centralities(G)
+    sub_graph = G.subgraph(sub_nodes).copy()
+    degrees, eigenvectors = get_nodes_centralities(G)
     #set centrality of nodes
-    for i in range(len(G.nodes())):
-        G.nodes()[i]["features"][:3] = degrees[i], closeness[i], eigenvectors[i]
+    for node in G.nodes():
+        G.nodes[node]["feature"][:2] = degrees[node], eigenvectors[node]
         
     sub_edges = nx.to_pandas_edgelist(sub_graph)
     sub_edges = sub_edges.rename(columns={'source': 'src', 'target': 'trg'})    
