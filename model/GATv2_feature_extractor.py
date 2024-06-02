@@ -29,6 +29,7 @@ class CustomGATv2Extractor(BaseFeaturesExtractor):
         
         self.conv1 = GATv2Conv(num_features, hidden_size, heads=heads, edge_dim=num_edge_features, dropout = dropout_rate, concat = False)
         self.conv2 = GATv2Conv(hidden_size, hidden_size, heads=heads, edge_dim=num_edge_features, dropout = dropout_rate, concat = False)
+        # self.flatten = nn.Flatten()
 
     def forward(self, observations):
         x = torch.tensor(observations['node_features'], dtype=torch.float)
@@ -39,5 +40,5 @@ class CustomGATv2Extractor(BaseFeaturesExtractor):
           x_1 = self.conv1(x[i], edge_index[i], edge_attr[i])
           x_1 = F.elu(x_1)
           x_1 = self.conv2(x_1, edge_index[i], edge_attr[i])
-          outputs.append(x_1.mean(dim=0, keepdim=True).unsqueeze(0))
+          outputs.append(x_1.mean(dim=0, keepdim=True))
         return torch.cat(outputs, dim = 0)
