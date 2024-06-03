@@ -354,6 +354,24 @@ class MyCustomDictRolloutBuffer(MYCustomRolloutBuffer):
             advantages=self.to_torch(self.advantages[batch_inds].flatten()),
             returns=self.to_torch(self.returns[batch_inds].flatten()),
         )
+        
+    def to_torch(self, array, copy: bool = True):
+        """
+        Convert a numpy array to a PyTorch tensor.
+        Note: it copies the data by default
+
+        :param array:
+        :param copy: Whether to copy or not the data (may be useful to avoid changing things
+            by reference). This argument is inoperative if the device is not the CPU.
+        :return:
+        """
+        if isinstance(array, list):
+            if copy:
+                return [th.tensor(arr, device=self.device) for arr in array]
+            return [th.as_tensor(arr, device=self.device) for arr in array]
+        if copy:
+            return th.tensor(array, device=self.device)
+        return th.as_tensor(array, device=self.device)
 
 
 from enum import Enum
