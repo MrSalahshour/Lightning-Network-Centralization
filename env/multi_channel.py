@@ -614,4 +614,4 @@ class FeeEnv(gym.Env):
 
     def get_normalizer_configs(self,):
         #return cap_max, base_max, rate_max
-        return 10000000, 10000000, 10000000
+        return self.data["capacity_max"], self.data["fee_base_max"], self.data["fee_rate_max"]

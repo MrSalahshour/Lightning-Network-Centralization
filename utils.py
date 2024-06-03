@@ -106,8 +106,7 @@ def get_or_create_list_of_sub_nodes(G, src, local_heads_number, providers, local
         
         return train_list
 
-#TODO: #14 #13 mode to be set
-def load_data(mode, node, directed_edges_path, providers_path, local_size, manual_balance, initial_balances, capacities, n_channels,local_heads_number):
+def load_data(mode, node, directed_edges_path, providers_path, local_size, manual_balance, initial_balances, capacities, n_channels,local_heads_number, capacities_upperbound):
     """
     :return:
     data = dict{mode: Levin is used for different modes: fee_selection, channel_openning (default: String)
@@ -168,6 +167,10 @@ def load_data(mode, node, directed_edges_path, providers_path, local_size, manua
     #                                                        channels,
     #                                                        local_size,
     #                                                        manual_balance, initial_balances, capacities,mode,local_heads_number)
+    
+    data["capacity_max"] = max(directed_edges["capacities"].max, capacities_upperbound)
+    data["fee_base_max"] = directed_edges["fee_base_msat"].max()
+    data["fee_rate_max"] = directed_edges["fee_rate_milli_msat"].max()
     return data
 
 

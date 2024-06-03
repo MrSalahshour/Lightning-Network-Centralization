@@ -70,7 +70,7 @@ if __name__ == '__main__':
     for s in range(args.n_seed):
         seed = np.random.randint(low=0, high=1000000)
         data = load_data(env_params['node_index'], env_params['data_path'], env_params['merchants_path'], env_params['local_size'],
-                         env_params['manual_balance'], [], [])
+                         env_params['manual_balance'], [], [],env_params["max_capacity"])
         for radius in radius_options:
             env = make_env(data, env_params, seed)
             model = load_localized_model(radius)

@@ -79,7 +79,7 @@ if __name__ == '__main__':
     for s in range(args.n_seed):
         seed = np.random.randint(low=0, high=1000000)
         data = load_data(env_params['mode'],env_params['node_index'], env_params['data_path'], env_params['merchants_path'], env_params['local_size'],
-                     env_params['manual_balance'], env_params['initial_balances'], env_params['capacities'],env_params['n_channels'],env_params['local_heads_number'])
+                     env_params['manual_balance'], env_params['initial_balances'], env_params['capacities'],env_params['n_channels'],env_params['local_heads_number'],env_params["max_capacity"])
         for algo in algos:
             env = make_env(data, env_params, seed, eval_mode=True)
             model = load_model(algo, env_params,"plotting/tb_results/trained_model/PPO_tensorboard_3channel_5000graphs_decaying_penalty_50length_episode_1mil_timestep")
