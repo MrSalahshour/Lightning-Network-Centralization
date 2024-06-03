@@ -23,7 +23,6 @@ class CustomGATv2Extractor(BaseFeaturesExtractor):
     """
     def __init__(self, observation_space, features_dim=64, hidden_size = 64, heads = 4, dropout_rate = 0.2):
         super(CustomGATv2Extractor, self).__init__(observation_space, features_dim)
-        
         num_features = observation_space['node_features'].shape[1]
         num_edge_features = observation_space['edge_attr'].shape[1]
         
@@ -32,13 +31,15 @@ class CustomGATv2Extractor(BaseFeaturesExtractor):
         # self.flatten = nn.Flatten()
 
     def forward(self, observations):
-        x = torch.tensor(observations['node_features'], dtype=torch.float)
-        edge_index = torch.tensor(observations['edge_index'], dtype=torch.long)
-        edge_attr = torch.tensor(observations['edge_attr'], dtype=torch.float)
+        x = [torch.tensor(x, dtype=torch.float) for x in observations['node_features']]
+        edge_index = [torch.tensor(x, dtype=torch.int64) for x in observations['edge_index']]
+        edge_attr = [torch.tensor(x, dtype=torch.float) for x in observations['edge_attr']]
         outputs = []
-        for i in range(x.size()[0]):
-          x_1 = self.conv1(x[i], edge_index[i], edge_attr[i])
+        for i in range(len(x)):
+          x_1 = self.conv1(x[i].squeeze(0), edge_index[i].squeeze(0), edge_attr[i].squeeze(0))
           x_1 = F.elu(x_1)
-          x_1 = self.conv2(x_1, edge_index[i], edge_attr[i])
+          x_1 = self.conv2(x_1, edge_index[i].squeeze(0), edge_attr[i].squeeze(0))
           outputs.append(x_1.mean(dim=0, keepdim=True))
-        return torch.cat(outputs, dim = 0)
+        final_output = torch.cat(outputs, dim = 0)
+        return final_output
+    

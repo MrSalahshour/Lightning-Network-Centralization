@@ -341,10 +341,17 @@ class simulator():
     #removing omitting channels from amount graphs
     for key in omitting_channels :
       for amount, graph in self.graphs_dict.items():
-          graph.remove_edge(self.src,key)
-          graph.remove_edge(key,self.src)
+          try: 
+            graph.remove_edge(self.src,key)
+            self.graphs_dict[amount] = graph
+          except:
+             pass
+          try:
+            graph.remove_edge(key,self.src)
+            self.graphs_dict[amount] = graph
+          except:
+             pass
           
-          self.graphs_dict[amount] = graph
       
     
     midpoint = len(fees) // 2
@@ -357,7 +364,6 @@ class simulator():
         if bal >= amount:
           graph.add_edge(trg,self.src,weight = base_fees[2*i]*1000 + fee_rates[2*i]*amount) # to turn fee base to mili msat multiply to 1000
           graph.add_edge(self.src,trg,weight = base_fees[2*i + 1]*1000 + fee_rates[2*i + 1]*amount) # to turn fee base to mili msat multiply to 1000
-          
           self.graphs_dict[amount] = graph
   def update_evolved_graph(self, fees, list_of_pairs):
 
