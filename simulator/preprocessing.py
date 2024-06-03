@@ -418,7 +418,7 @@ def components(G, nodes):
     return nx.strongly_connected_components(H)
 
 
-def init_node_params(edges, providers, verbose=True):
+def init_node_params(edges, providers, verbose=False):
     """Initialize source and target distribution of each node in order to draw transaction at random later."""
     G = nx.from_pandas_edgelist(edges, source="src", target="trg", edge_attr=["capacity"], create_using=nx.DiGraph())
     active_providers = list(set(providers).intersection(set(G.nodes())))

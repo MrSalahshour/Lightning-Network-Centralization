@@ -10,7 +10,7 @@ import pickle
 import graph_embedding_processing
 from sklearn.model_selection import train_test_split
 from model.GATv2_feature_extractor import CustomGATv2Extractor
-from models import MyCustomDictRolloutBuffer
+from model.custom_buffer import MyCustomDictRolloutBuffer
 
 
 def make_agent(env, algo, device, tb_log_dir):

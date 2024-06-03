@@ -224,8 +224,6 @@ class FeeEnv(gym.Env):
     def step(self, action):
         
         action = self.aggregate_and_standardize_action(action)
-        print("src:",self.src)
-                
         
         if self.time_step%100==0:
             print("action: ",action,"time step: ",self.time_step)
@@ -530,7 +528,7 @@ class FeeEnv(gym.Env):
         active_channels = preprocessing.create_active_channels(network_dictionary, [])
 
         try:
-            node_variables, active_providers, _ = preprocessing.init_node_params(sub_edges, sub_providers, verbose=True)
+            node_variables, active_providers, _ = preprocessing.init_node_params(sub_edges, sub_providers, verbose=False)
         except:
             node_variables, active_providers = None
             
@@ -561,9 +559,7 @@ class FeeEnv(gym.Env):
                                    fee_policy = self.data["fee_policy"],
                                    fixed_transactions=False,
                                    graph_nodes = self.graph_nodes)
-        
-        print("DONE WITH SET NEW GRAPH ENV")
-        
+                
         return sub_graph
         
     def extract_graph_attributes(self, G, exclude_attributes=None):

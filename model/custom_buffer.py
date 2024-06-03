@@ -15,7 +15,7 @@ from stable_baselines3.common.type_aliases import (
 )
 from stable_baselines3.common.utils import get_device
 from stable_baselines3.common.vec_env import VecNormalize
-from stable_baselines3.common.buffer import BaseBuffer
+from stable_baselines3.common.buffers import BaseBuffer
 
 try:
     # Check memory used by replay buffer when possible
@@ -260,7 +260,7 @@ class MyCustomDictRolloutBuffer(MYCustomRolloutBuffer):
     def reset(self) -> None:
         self.observations = {}
         for key, obs_input_shape in self.obs_shape.items():
-            self.observations[key] = self.observations = [np.zeros((self.buffer_size, self.n_envs, *obs_input_shape), dtype=np.float32)] * self.buffer_size
+            self.observations[key] = [np.zeros((self.buffer_size, self.n_envs, *obs_input_shape), dtype=np.float32)] * self.buffer_size
 
         self.actions = np.zeros((self.buffer_size, self.n_envs, self.action_dim), dtype=np.float32)
         self.rewards = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
@@ -354,7 +354,7 @@ class MyCustomDictRolloutBuffer(MYCustomRolloutBuffer):
             advantages=self.to_torch(self.advantages[batch_inds].flatten()),
             returns=self.to_torch(self.returns[batch_inds].flatten()),
         )
-        
+
     def to_torch(self, array, copy: bool = True):
         """
         Convert a numpy array to a PyTorch tensor.
