@@ -354,6 +354,7 @@ class MyCustomDictRolloutBuffer(MYCustomRolloutBuffer):
             advantages=self.to_torch(self.advantages[batch_inds].flatten()),
             returns=self.to_torch(self.returns[batch_inds].flatten()),
         )
+
     def to_torch(self, array, copy: bool = True):
         """
         Convert a numpy array to a PyTorch tensor.
