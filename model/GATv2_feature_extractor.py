@@ -28,18 +28,28 @@ class CustomGATv2Extractor(BaseFeaturesExtractor):
         
         self.conv1 = GATv2Conv(num_features, hidden_size, heads=heads, edge_dim=num_edge_features, dropout = dropout_rate, concat = False)
         self.conv2 = GATv2Conv(hidden_size, hidden_size, heads=heads, edge_dim=num_edge_features, dropout = dropout_rate, concat = False)
-        # self.flatten = nn.Flatten()
 
     def forward(self, observations):
-        x = [torch.tensor(x, dtype=torch.float) for x in observations['node_features']]
-        edge_index = [torch.tensor(x, dtype=torch.int64) for x in observations['edge_index']]
-        edge_attr = [torch.tensor(x, dtype=torch.float) for x in observations['edge_attr']]
+        x = [x.clone().detach().float() for x in observations['node_features']]
+        edge_index = [x.clone().detach().long() for x in observations['edge_index']]
+        edge_attr = [x.clone().detach().float() for x in observations['edge_attr']]
         outputs = []
         for i in range(len(x)):
           x_1 = self.conv1(x[i].squeeze(0), edge_index[i].squeeze(0), edge_attr[i].squeeze(0))
           x_1 = F.elu(x_1)
           x_1 = self.conv2(x_1, edge_index[i].squeeze(0), edge_attr[i].squeeze(0))
           outputs.append(x_1.mean(dim=0, keepdim=True))
-        final_output = torch.cat(outputs, dim = 0)
+        final_output = torch.cat(outputs, dim=0)
         return final_output
+        # x = [torch.tensor(x, dtype=torch.float) for x in observations['node_features']]
+        # edge_index = [torch.tensor(x, dtype=torch.int64) for x in observations['edge_index']]
+        # edge_attr = [torch.tensor(x, dtype=torch.float) for x in observations['edge_attr']]
+        # outputs = []
+        # for i in range(len(x)):
+        #   x_1 = self.conv1(x[i].squeeze(0), edge_index[i].squeeze(0), edge_attr[i].squeeze(0))
+        #   x_1 = F.elu(x_1)
+        #   x_1 = self.conv2(x_1, edge_index[i].squeeze(0), edge_attr[i].squeeze(0))
+        #   outputs.append(x_1.mean(dim=0, keepdim=True))
+        # final_output = torch.cat(outputs, dim = 0)
+        # return final_output
     

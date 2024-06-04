@@ -168,7 +168,7 @@ def load_data(mode, node, directed_edges_path, providers_path, local_size, manua
     #                                                        local_size,
     #                                                        manual_balance, initial_balances, capacities,mode,local_heads_number)
     
-    data["capacity_max"] = max(directed_edges["capacities"].max, capacities_upperbound)
+    data["capacity_max"] = max(directed_edges["capacity"].max(), capacities_upperbound)
     data["fee_base_max"] = directed_edges["fee_base_msat"].max()
     data["fee_rate_max"] = directed_edges["fee_rate_milli_msat"].max()
     return data
