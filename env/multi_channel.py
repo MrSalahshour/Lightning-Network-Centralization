@@ -72,6 +72,7 @@ class FeeEnv(gym.Env):
         self.data = data
         self.src = self.data['src']
         self.LN_graph = LN_graph
+        self.undirected_attributed_LN_graph, self.reverse_mapping = self.set_undirected_attributed_LN_graph()
         self.providers = data['providers']
         self.mode = mode
         self.transaction_types = generate_transaction_types(number_of_transaction_types, counts, amounts,
@@ -438,12 +439,26 @@ class FeeEnv(gym.Env):
     def get_local_graph(self,scale):
         return self.current_graph
     
+    def set_undirected_attributed_LN_graph(self):
+        undirected_G = nx.Graph(self.LN_graph)
+        # Reindex nodes to be numeric
+        mapping = {node: i for i, node in enumerate(undirected_G.nodes())}
+        numeric_undirected_G = nx.relabel_nodes(undirected_G, mapping)
+        # Adding node attributes to the numeric graph
+        for node, data in undirected_G.nodes(data=True):
+            numeric_undirected_G.nodes[mapping[node]].update(data)
+
+        reverse_mapping = {i: node for node, i in mapping.items()}
+        return numeric_undirected_G, reverse_mapping
+
+        
+    
 
     def sample_graph_environment(self):
         #TODO: this should not be set manually and should get pramaeter but can't use self.data['nodes']
         random.seed()
-        sampled_graph = preprocessing.get_fire_forest_sample(self.LN_graph, 100)    
-        return list(sampled_graph.nodes())
+        sampled_sub_nodes = preprocessing.get_fire_forest_sample(self.undirected_attributed_LN_graph, self.reverse_mapping, 100)    
+        return sampled_sub_nodes
     
     def evolve_graph(self):
         number_of_new_channels = self.generate_number_of_new_channels(self.time_step)
