@@ -1,11 +1,3 @@
-import sys
-import os
-
-project_root = os.path.dirname(os.path.realpath(__file__))
-stable_path = os.path.join(project_root, "stable_baselines3")
-
-sys.path.append(stable_path)
-
 from utils import load_data, make_agent, make_env, load_model
 from stable_baselines3 import SAC, TD3, PPO
 from numpy import load
