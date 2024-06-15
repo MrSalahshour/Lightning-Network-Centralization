@@ -20,7 +20,8 @@ class simulator():
                fee_policy,
                fixed_transactions = True,
                support_onchain_rebalancing = False,
-               graph_nodes = None):
+               graph_nodes = None,
+               current_graph = None):
     
     self.mode = mode
     self.src = src
@@ -37,6 +38,7 @@ class simulator():
     self.fixed_transactions = fixed_transactions
     self.support_onchain_rebalancing = support_onchain_rebalancing
     self.graph_nodes = graph_nodes
+    self.current_graph = current_graph
     
     self.transaction_amounts = np.zeros(len(self.graph_nodes))
     self.map_nodes_to_id = dict(zip(self.graph_nodes, np.arange(len(node_variables))))
@@ -47,7 +49,7 @@ class simulator():
       self.transactions_dict = self.generate_transactions_dict(src, transaction_types, node_variables, active_providers)
     else :
       self.transactions_dict = None
- 
+
 
  
 
@@ -111,6 +113,12 @@ class simulator():
       trg_src = self.network_dictionary[(trg,src)]
       trg_src_balance = trg_src[0] + transaction_amount
       self.network_dictionary[(trg,src)][0] = trg_src_balance
+      print(self.network_dictionary[(trg,src)])
+      
+      self.current_graph[src,trg]['balance'] = src_trg_balance
+      self.current_graph[trg,src]['balance'] = trg_src_balance
+      exit()
+
       
       for (count,amount,epsilon) in self.transaction_types:
           graph = self.graphs_dict[amount]  

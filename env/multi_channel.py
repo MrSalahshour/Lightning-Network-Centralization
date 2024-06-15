@@ -77,7 +77,7 @@ class FeeEnv(gym.Env):
         self.mode = mode
         self.transaction_types = generate_transaction_types(number_of_transaction_types, counts, amounts,
                                                        epsilons)
-        self.current_graph = self.set_new_graph_environment()
+        self.set_new_graph_environment()
         self.n_nodes = len(self.data['nodes'])
         
         
@@ -117,13 +117,13 @@ class FeeEnv(gym.Env):
         
 
         
-        num_node_features = len(next(iter(self.current_graph.nodes(data=True)))[1]['feature'])
-        num_edge_features = len(next(iter(self.current_graph.edges(data=True)))[2]) - 2
+        num_node_features = len(next(iter(self.simulator.current_graph.nodes(data=True)))[1]['feature'])
+        num_edge_features = len(next(iter(self.simulator.current_graph.edges(data=True)))[2]) - 2
 
         print("num_node_features:",num_node_features)
         print("num_edge_features:",num_edge_features)
 
-        num_edges = len(self.current_graph.edges())
+        num_edges = len(self.simulator.current_graph.edges())
         self.node_features_space = spaces.Box(low=0, high=1, shape=(self.n_nodes, num_node_features), dtype=np.float32)
         self.edge_features_space = spaces.Box(low=0, high=1, shape=(num_edges, num_edge_features), dtype=np.float32)
         self.edge_index_space = spaces.Box(low=0, high=self.n_nodes, shape=(2, num_edges), dtype=np.float32)
@@ -146,7 +146,7 @@ class FeeEnv(gym.Env):
         # self.state = np.append(self.initial_balances, np.zeros(shape=(self.n_channel,)))
         
 
-        # self.graph_embedding =self.get_new_graph_embedding(self.current_graph,self.embedding_mode)
+        # self.graph_embedding =self.get_new_graph_embedding(self.simulator.current_graph,self.embedding_mode)
 
         # self.state = {
         #     'capacities': np.zeros(self.n_nodes),
@@ -154,7 +154,7 @@ class FeeEnv(gym.Env):
         #     'graph_embedding': self.graph_embedding
         # }
         
-        node_features, edge_index, edge_attr = self.extract_graph_attributes(self.current_graph, exclude_attributes=['capacity, channel_id'])
+        node_features, edge_index, edge_attr = self.extract_graph_attributes(self.simulator.current_graph, exclude_attributes=['capacity', 'channel_id'])
         
         self.state = {
 
@@ -279,9 +279,9 @@ class FeeEnv(gym.Env):
         #     'graph_embedding': self.graph_embedding
         # } 
         #TODO: use balances and transaction amounts here for edeg and node attributes, calculate the centralities here. 
-        self.current_graph = self.evolve_graph()
+        self.simulator.current_graph = self.evolve_graph()
 
-        node_features, edge_index, edge_attr = self.extract_graph_attributes(self.current_graph, exclude_attributes=['capacity, channel_id'])
+        node_features, edge_index, edge_attr = self.extract_graph_attributes(self.simulator.current_graph, exclude_attributes=['capacity', 'channel_id'])
 
         self.state = {
 
@@ -329,14 +329,14 @@ class FeeEnv(gym.Env):
         
         else:
             self.prev_action = []
-            self.current_graph = self.set_new_graph_environment()
-            # self.graph_embedding = self.get_new_graph_embedding(self.current_graph,self.embedding_mode)
+            self.set_new_graph_environment()
+            # self.graph_embedding = self.get_new_graph_embedding(self.simulator.current_graph,self.embedding_mode)
             # self.state = {
             #     'capacities': np.zeros(self.n_nodes),
             #     'transaction_amounts': np.zeros(self.n_nodes),
             #     'graph_embedding': self.graph_embedding #sample new embedding
             # }
-            node_features, edge_index, edge_attr = self.extract_graph_attributes(self.current_graph, exclude_attributes=['capacity, channel_id'])
+            node_features, edge_index, edge_attr = self.extract_graph_attributes(self.simulator.current_graph, exclude_attributes=['capacity', 'channel_id'])
             self.state = {
             "node_features" : node_features,
             "edge_attr" : edge_attr,
@@ -437,7 +437,7 @@ class FeeEnv(gym.Env):
 
 
     def get_local_graph(self,scale):
-        return self.current_graph
+        return self.simulator.current_graph
     
     def set_undirected_attributed_LN_graph(self):
         undirected_G = nx.Graph(self.LN_graph)
@@ -463,7 +463,7 @@ class FeeEnv(gym.Env):
     def evolve_graph(self):
         number_of_new_channels = self.generate_number_of_new_channels(self.time_step)
 
-        transformed_graph = self.add_edges(self.current_graph, number_of_new_channels)
+        transformed_graph = self.add_edges(self.simulator.current_graph, number_of_new_channels)
 
         return transformed_graph
     
@@ -573,9 +573,8 @@ class FeeEnv(gym.Env):
                                    active_providers=self.data['active_providers'],
                                    fee_policy = self.data["fee_policy"],
                                    fixed_transactions=False,
-                                   graph_nodes = self.graph_nodes)
-                
-        return sub_graph
+                                   graph_nodes = self.graph_nodes,
+                                   current_graph = sub_graph)
         
     def extract_graph_attributes(self, G, exclude_attributes=None):
         """
@@ -593,7 +592,7 @@ class FeeEnv(gym.Env):
         """
 
         node_features = np.array([G.nodes[n]['feature'] for n in G.nodes]).astype(np.float32)
-        degrees, eigenvectors = preprocessing.get_nodes_centralities(self.current_graph)
+        degrees, eigenvectors = preprocessing.get_nodes_centralities(self.simulator.current_graph)
         if np.max(self.simulator.transaction_amounts) == 0:
             normalized_transaction_amounts = np.zeros_like(self.simulator.transaction_amounts)
         else:
@@ -629,4 +628,4 @@ class FeeEnv(gym.Env):
 
     def get_normalizer_configs(self,):
         #return cap_max, base_max, rate_max
-        return self.data["capacity_max"], self.data["fee_base_max"], self.data["fee_rate_max"]
+        return self.data["fee_base_max"], self.data["fee_rate_max"], self.data["capacity_max"]
