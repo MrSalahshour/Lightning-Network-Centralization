@@ -92,7 +92,7 @@ def main():
 
     train_params = {'algo': args.algo,
                     'total_timesteps': args.total_timesteps,
-                    'device': args. device}
+                    'device': args.device}
 
     env_params = {'mode' : args.mode,
                   'data_path': args.data_path,

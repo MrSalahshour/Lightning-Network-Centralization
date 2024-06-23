@@ -8,8 +8,6 @@ from operator import itemgetter
 from littleballoffur import ForestFireSampler
 from collections import deque
 
-prev_nodes = set([])
-
 def aggregate_edges(directed_edges):
     """aggregating multiedges"""
     grouped = directed_edges.groupby(["src", "trg"])
@@ -187,10 +185,6 @@ def get_fire_forest_sample(G, reverse_mapping, sample_size, burning_prob=0.7):
     
     sampled_undirected_G = nx.relabel_nodes(sampled_numeric_undirected_G, reverse_mapping)
     sub_nodes = list(sampled_undirected_G.nodes())
-
-    global prev_nodes
-    print(jaccard_similarity(prev_nodes,set(sub_nodes)))
-    prev_nodes = set(sub_nodes)
     return sub_nodes
     
 
@@ -321,7 +315,6 @@ def get_sub_graph_properties(G,sub_nodes,providers):
 
     sub_providers = list(set(sub_nodes) & set(providers))
     sub_graph = G.subgraph(sub_nodes).copy()
-
     degrees, eigenvectors = get_nodes_centralities(G)
     #set centrality of nodes
     for node in G.nodes():

@@ -504,7 +504,6 @@ class FeeEnv(gym.Env):
 
         return list_of_pairs
 
-    
     def add_edges(self, G, k): 
 
         list_of_pairs = self.fetch_new_pairs_for_create_new_channels(G, k)
@@ -529,7 +528,6 @@ class FeeEnv(gym.Env):
 
         return G
     
-        
     def set_new_graph_environment(self):
 
         sub_nodes = self.sample_graph_environment()
@@ -553,7 +551,10 @@ class FeeEnv(gym.Env):
         self.data['network_dictionary'] = network_dictionary
         self.data['node_variables'] = node_variables
         self.data['active_providers'] = active_providers
-        self.data['nodes'] = sub_nodes
+        self.data['nodes'] = sub_graph.nodes()
+        
+
+        
 
         self.graph_nodes = list(self.data['nodes'])
         if self.src in self.graph_nodes:
@@ -590,7 +591,6 @@ class FeeEnv(gym.Env):
                 - edge_index (numpy.ndarray): A 2D array of edge indices.
                 - edge_attr (numpy.ndarray): A 2D array of edge attributes.
         """
-
         node_features = np.array([G.nodes[n]['feature'] for n in G.nodes]).astype(np.float32)
         degrees, eigenvectors = preprocessing.get_nodes_centralities(self.simulator.current_graph)
         if np.max(self.simulator.transaction_amounts) == 0:
@@ -626,29 +626,7 @@ class FeeEnv(gym.Env):
 
         return node_features, edge_index, edge_attr
 
-
-
     def get_normalizer_configs(self):
         #return cap_max, base_max, rate_max
         return self.data["fee_base_max"], self.data["fee_rate_max"], self.data["capacity_max"]
     
-
-    
-
-    # Function to compare a new list with the last saved list
-    def compare_and_update(self, new_list):
-        last_list = self.last_list
-        
-        # If there is a last list to compare with
-        if last_list is not None:
-            # Determine the length of the smaller list
-            min_length = min(len(new_list), len(last_list))
-            
-            # Compare the elements and count non-identical elements
-            non_identical_count = sum(1 for i in range(min_length) if new_list[i].all() != last_list[i].all())
-            
-            # Print the count of non-identical elements
-            print("Number of non-identical elements:", non_identical_count)
-        
-        # Update the last list with the new list
-        self.last_list = new_list
