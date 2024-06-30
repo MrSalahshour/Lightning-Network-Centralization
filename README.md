@@ -1,4 +1,4 @@
-# LNChannelOpenning
+# LNChannelOpening
 Lightning Network Channel and Capacity Selection
 
 
