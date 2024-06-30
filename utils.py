@@ -1,9 +1,9 @@
 import sys
 import os
 
-project_root = os.path.dirname(os.path.realpath(__file__))
-stable_path = os.path.join(project_root, "stable-baselines3")
-sys.path.append(stable_path)
+# project_root = os.path.dirname(os.path.realpath(__file__))
+# stable_path = os.path.join(project_root, "stable-baselines3")
+# sys.path.append(stable_path)
 
 import numpy as np
 import stable_baselines3
@@ -22,8 +22,8 @@ from model.custom_buffer import MyCustomDictRolloutBuffer
 
 def make_agent(env, algo, device, tb_log_dir):
     #NOTE: You must use `MultiInputPolicy` when working with dict observation space, not MlpPolicy
-    # policy = "MlpPolicy"
-    policy = "MultiInputPolicy"
+    policy = "MlpPolicy"
+    # policy = "MultiInputPolicy"
     # policy = Custom_policy
     # create model
     if algo == "PPO":
@@ -34,8 +34,8 @@ def make_agent(env, algo, device, tb_log_dir):
             features_extractor_kwargs=dict(features_dim=64),
         )
         # Instantiate the PPO agent with the custom policy
-        model = PPO(policy, env, device=device, tensorboard_log=tb_log_dir,rollout_buffer_class = MyCustomDictRolloutBuffer, policy_kwargs=policy_kwargs, verbose=1)
-        # model = PPO(policy, env, verbose=1, device=device, tensorboard_log=tb_log_dir)
+        # model = PPO(policy, env, device=device, tensorboard_log=tb_log_dir,rollout_buffer_class = MyCustomDictRolloutBuffer, policy_kwargs=policy_kwargs, verbose=1)
+        model = PPO(policy, env, verbose=1, device=device, tensorboard_log=tb_log_dir)
     elif algo == "TRPO":
         from sb3_contrib import TRPO
         model = TRPO(policy, env, verbose=1, device=device, tensorboard_log=tb_log_dir)
@@ -72,7 +72,7 @@ def make_env(data, env_params, seed):
     providers = data['providers']
 
     G = preprocessing.make_LN_graph(directed_edges, providers, env_params['manual_balance'], data["src"]
-    , data["trgs"], data["channel_ids"], env_params['capacities'], env_params['initial_balances'])
+    , data["trgs"], data["channel_ids"], data['fee_policy'], env_params['capacities'], env_params['initial_balances'])
 
    
 

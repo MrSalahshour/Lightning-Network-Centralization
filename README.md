@@ -1,5 +1,5 @@
-# LNTransactionFee
-Lightning Network Transaction Fee Solver
+# LNChannelOpening
+Lightning Network Channel and Capacity Selection
 
 
 <div>
@@ -41,22 +41,24 @@ All dependencies will be handled using the command :
 ### Run
 
 ```
-python3 -m scripts.ln_fee --algo PPO --tb_name PPO_tensorboard
-python3 -m scripts.baselines --strategy static --node_index 71555
+python3 -m scripts.ln_channel_opening --algo PPO --tb_name PPO_tensorboard
+python3 -m scripts.baselines --strategy random 
 ```
 
 ### Parameters
-ln_fee:
+ln_channel_opening:
 
 | Parameter              | Default | choices                                      |
 |------------------------|--------|----------------------------------------------|
-| _--algo_               | PPO    | PPO, TRPO, SAC, TD3, A2C, DDPG     |
-| _--node_index_           | 71555 | Arbitrary index in the data            |
-| _--total_timesteps_    | 100000 | Arbitrary Integer                            |
-| _--max_episode_length_ | 200    | Arbitrary Integer less than total_timesteps  |
+| _--algo_               | PPO    | PPO, A2C     |
+| _--total_timesteps_    | 200000 | Arbitrary Integer                            |
+| _--max_episode_length_ | 10    | Arbitrary Integer less than total_timesteps  |
 | _--counts_             | [10, 10, 10] | List of Integers                             |
 | _--amounts_            | [10000, 50000, 100000] | List of Integers |
 | _--epsilons_           | [.6, .6, .6] | List of floats between 0 and 1               |
+| _--capacity_upper_scale_bound_           | 25 | Arbitrary Integer               |
+| _--max_capacity_           | 1e7 | Arbitrary Integer               |
+
 
 
 - You can modify the transaction sampling parameters by changing counts, amounts and epsilons
@@ -68,7 +70,7 @@ baselines:
 
 | Parameter              | Default | choices                                      |
 |------------------------|--------|----------------------------------------------|
-| _--strategy_            | static | static, proportional, match_peer     |
+| _--strategy_            | top_k_betweenness | random, top_k_betweenness     |
 
 
 
