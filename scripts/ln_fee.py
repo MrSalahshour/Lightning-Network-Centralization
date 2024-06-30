@@ -69,9 +69,9 @@ def main():
     parser.add_argument('--n_seed', type=int, default=1) # 5
     parser.add_argument('--fee_base_upper_bound', type=int, default=100)
     parser.add_argument('--total_timesteps', type=int, default=200000)
-    parser.add_argument('--max_episode_length', type=int, default=10)
+    parser.add_argument('--max_episode_length', type=int, default=5)
     parser.add_argument('--local_size', type=int, default=100)
-    parser.add_argument('--counts', default=[10, 10, 10], type=lambda s: [int(item) for item in s.split(',')])
+    parser.add_argument('--counts', default=[100, 100, 100], type=lambda s: [int(item) for item in s.split(',')])
     parser.add_argument('--amounts', default=[10000, 50000, 100000], type=lambda s: [int(item) for item in s.split(',')])
     parser.add_argument('--epsilons', default=[.6, .6, .6], type=lambda s: [float(item) for item in s.split(',')])
     parser.add_argument('--manual_balance', default=False)
@@ -79,7 +79,7 @@ def main():
     parser.add_argument('--capacities', default=[],type=lambda s: [int(item) for item in s.split(',')])
     parser.add_argument('--device', default='auto')
     parser.add_argument('--max_capacity', type = int, default=1e7) #SAT
-    parser.add_argument('--n_channels', type=int, default=3)
+    parser.add_argument('--n_channels', type=int, default=5)
     parser.add_argument('--mode', type=str, default='channel_openning')#TODO: add this arg to all scripts
     parser.add_argument('--capacity_upper_scale_bound', type=int, default=25)
     parser.add_argument('--local_heads_number', type=int, default=5)

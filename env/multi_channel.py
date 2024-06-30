@@ -68,6 +68,9 @@ class FeeEnv(gym.Env):
                   number_of_transaction_types, counts, amounts, epsilons, capacity_upper_scale_bound,
                     seed, LN_graph):
         # Source node\
+        self.max_capacity = max_capacity
+        self.prev_reward = 0
+        self.capacity_upper_scale_bound = capacity_upper_scale_bound
         self.total_time_step = 0
         self.data = data
         self.src = self.data['src']
@@ -81,7 +84,7 @@ class FeeEnv(gym.Env):
         self.n_nodes = len(self.data['nodes'])
         
         
-        self.prev_action = []
+        # self.prev_action = []
         
         
         self.n_channel = data['n_channels']
@@ -91,9 +94,9 @@ class FeeEnv(gym.Env):
          # nodes should be minus one to not include our node
        
         print("number of nodes: ",self.n_nodes)
-        self.graph_nodes = list(self.data['nodes'])
-        if self.src in self.graph_nodes:
-            self.graph_nodes.remove(self.src)
+        # self.graph_nodes = list(self.data['nodes'])
+        # if self.src in self.graph_nodes:
+        #     self.graph_nodes.remove(self.src)
         
         print('action dim:', self.n_nodes)
         
@@ -111,27 +114,32 @@ class FeeEnv(gym.Env):
         # first n_channels are id's  of connected nodes and the seconds are corresponding  capacities
         # add self.capacities to the fields of env class'''
 
-        self.maximum_capacity = max_capacity
+        self.remaining_capacity = self.max_capacity
 
-        self.action_space = spaces.MultiDiscrete([self.n_nodes for _ in range(self.n_channel)] + [capacity_upper_scale_bound for _ in range(self.n_channel)])
+        # self.action_space = spaces.MultiDiscrete([self.n_nodes for _ in range(self.n_channel)] + [capacity_upper_scale_bound for _ in range(self.n_channel)])
+
+        self.action_space = spaces.MultiDiscrete([self.n_nodes] + [capacity_upper_scale_bound])
+
         
 
         
         num_node_features = len(next(iter(self.simulator.current_graph.nodes(data=True)))[1]['feature'])
-        num_edge_features = len(next(iter(self.simulator.current_graph.edges(data=True)))[2]) - 2
+        # num_edge_features = len(next(iter(self.simulator.current_graph.edges(data=True)))[2]) - 2
 
         print("num_node_features:",num_node_features)
-        print("num_edge_features:",num_edge_features)
+        # print("num_edge_features:",num_edge_features)
 
-        num_edges = len(self.simulator.current_graph.edges())
-        self.node_features_space = spaces.Box(low=0, high=1, shape=(self.n_nodes, num_node_features), dtype=np.float32)
-        self.edge_features_space = spaces.Box(low=0, high=1, shape=(num_edges, num_edge_features), dtype=np.float32)
-        self.edge_index_space = spaces.Box(low=0, high=self.n_nodes, shape=(2, num_edges), dtype=np.float32)
-        self.observation_space = spaces.Dict({
-            "node_features" : self.node_features_space,
-            "edge_attr" : self.edge_features_space,
-            "edge_index": self.edge_index_space
-        })
+        # num_edges = len(self.simulator.current_graph.edges())
+        # self.node_features_space = spaces.Box(low=0, high=1, shape=(self.n_nodes, num_node_features), dtype=np.float32)
+        # self.edge_features_space = spaces.Box(low=0, high=1, shape=(num_edges, num_edge_features), dtype=np.float32)
+        # self.edge_index_space = spaces.Box(low=0, high=self.n_nodes, shape=(2, num_edges), dtype=np.float32)
+        # self.observation_space = spaces.Dict({
+        #     "node_features" : self.node_features_space,
+        #     "edge_attr" : self.edge_features_space,
+        #     "edge_index": self.edge_index_space
+        # })
+
+        self.observation_space = spaces.Box(low=0, high=1, shape=(self.n_nodes, num_node_features), dtype=np.float32)
 
 
         # self.observation_space = Dict({
@@ -154,14 +162,17 @@ class FeeEnv(gym.Env):
         #     'graph_embedding': self.graph_embedding
         # }
         
-        node_features, edge_index, edge_attr = self.extract_graph_attributes(self.simulator.current_graph, exclude_attributes=['capacity', 'channel_id'])
-        
-        self.state = {
+        # node_features, edge_index, edge_attr = self.extract_graph_attributes(self.simulator.current_graph, exclude_attributes=['capacity', 'channel_id'])
+        node_features = self.extract_graph_attributes(self.simulator.current_graph, exclude_attributes=['capacity', 'channel_id'])
 
-            "node_features" : node_features,
-            "edge_attr" : edge_attr,
-            "edge_index": edge_index
-        }
+        # self.state = {
+
+        #     "node_features" : node_features,
+        #     "edge_attr" : edge_attr,
+        #     "edge_index": edge_index
+        # }
+
+        self.state = node_features
             
         self.time_step = 0
         self.max_episode_length = max_episode_length
@@ -224,16 +235,18 @@ class FeeEnv(gym.Env):
     
     def step(self, action):
         
-        action = self.aggregate_and_standardize_action(action)
+        # action = self.aggregate_and_standardize_action(action)
         
-        if self.total_time_step % 500==0:
+        if self.total_time_step % 450 == 0:
             print("action: ",action,"time step: ",self.time_step)
   
     
         action = self.map_action_to_capacity(action)
+
         midpoint = len(action) // 2
 
-        self.simulator.trgs = action[:midpoint]
+        # self.simulator.trgs = action[:midpoint]
+        
         self.n_channel = midpoint
          
         '''
@@ -241,9 +254,10 @@ class FeeEnv(gym.Env):
         _channels dict and also, channels not present anymore, will be deleted
         '''
         #attention: budget removed
-        additive_channels, ommitive_channels = self.simulator.update_network_and_active_channels(action, self.prev_action)
+        # additive_channels, ommitive_channels = self.simulator.update_network_and_active_channels(action, self.prev_action)
+        additive_channels, ommitive_channels = self.simulator.update_network_and_active_channels(action)
 
-        self.prev_action = action
+        # self.prev_action = action
 
         fees = self.simulator.get_additive_channel_fees(action)
         
@@ -260,11 +274,23 @@ class FeeEnv(gym.Env):
 
         # else:
         balances, transaction_amounts, transaction_numbers = self.simulate_transactions(fees,additive_channels)
-        reward = 1e-6 *(np.sum(np.multiply(fees_to_use_for_reward[0:self.n_channel], transaction_amounts ) + \
+        
+        reward = 1e-6*(np.sum(np.multiply(fees_to_use_for_reward[0:self.n_channel], transaction_amounts ) + \
                 np.multiply(fees_to_use_for_reward[self.n_channel:], transaction_numbers)))
+        
+        if self.total_time_step % 450==0:
+            print("REWARD: ",reward)
+        
+        
+        
+        reward = reward - self.prev_reward
+        self.prev_reward += reward
 
         self.time_step += 1
-        self.total_time_step+=1
+        self.total_time_step += 1
+
+        
+
         info = {'TimeLimit.truncated': True if self.time_step >= self.max_episode_length else False}
         done = self.time_step >= self.max_episode_length
 
@@ -281,15 +307,16 @@ class FeeEnv(gym.Env):
         #TODO: use balances and transaction amounts here for edeg and node attributes, calculate the centralities here. 
         self.simulator.current_graph = self.evolve_graph()
 
-        node_features, edge_index, edge_attr = self.extract_graph_attributes(self.simulator.current_graph, exclude_attributes=['capacity', 'channel_id'])
+        # node_features, edge_index, edge_attr = self.extract_graph_attributes(self.simulator.current_graph, exclude_attributes=['capacity', 'channel_id'])
+        node_features = self.extract_graph_attributes(self.simulator.current_graph, exclude_attributes=['capacity', 'channel_id'])
+        self.state = node_features
+        # self.state = {
 
-        self.state = {
+        # "node_features" : node_features,
+        # "edge_attr" : edge_attr,
+        # "edge_index": edge_index
 
-        "node_features" : node_features,
-        "edge_attr" : edge_attr,
-        "edge_index": edge_index
-
-        }
+        # }
         
 
 
@@ -311,7 +338,7 @@ class FeeEnv(gym.Env):
             tuple: A tuple containing the balances, transaction amounts, and transaction numbers resulting from the simulation.
         """
         #NOTE: fees set in the step, now will be added to network_dict and active_channels
-        self.simulator.set_channels_fees(self.mode,action,additive_channels[:len(additive_channels)//2])
+        self.simulator.set_channels_fees(self.mode, action, additive_channels[:len(additive_channels)//2])
 
         output_transactions_dict = self.simulator.run_simulation(action)
         balances, transaction_amounts, transaction_numbers = self.simulator.get_simulation_results(action,
@@ -328,7 +355,9 @@ class FeeEnv(gym.Env):
             return np.array(self.state, dtype=np.float64)
         
         else:
-            self.prev_action = []
+            # self.prev_action = []
+            self.prev_reward = 0
+            self.remaining_capacity = self.max_capacity
             self.set_new_graph_environment()
             # self.graph_embedding = self.get_new_graph_embedding(self.simulator.current_graph,self.embedding_mode)
             # self.state = {
@@ -336,12 +365,14 @@ class FeeEnv(gym.Env):
             #     'transaction_amounts': np.zeros(self.n_nodes),
             #     'graph_embedding': self.graph_embedding #sample new embedding
             # }
-            node_features, edge_index, edge_attr = self.extract_graph_attributes(self.simulator.current_graph, exclude_attributes=['capacity', 'channel_id'])
-            self.state = {
-            "node_features" : node_features,
-            "edge_attr" : edge_attr,
-            "edge_index": edge_index
-            }
+            # node_features, edge_index, edge_attr = self.extract_graph_attributes(self.simulator.current_graph, exclude_attributes=['capacity', 'channel_id'])
+            # self.state = {
+            # "node_features" : node_features,
+            # "edge_attr" : edge_attr,
+            # "edge_index": edge_index
+            # }
+            node_features = self.extract_graph_attributes(self.simulator.current_graph, exclude_attributes=['capacity', 'channel_id'])
+            self.state = node_features
             self.transaction_amounts_list = np.zeros((self.n_nodes,))
             return self.state 
 
@@ -374,15 +405,17 @@ class FeeEnv(gym.Env):
         Returns:
             list: A list containing the target nodes and their corresponding capacities.
         """
-        midpoint = len(action) // 2
-        fixed_action = []
-        #seeting up trgs from their ind
-        fixed_trgs = [self.graph_nodes[i] for i in action[:midpoint]]
-        
-        if len(action) != 0:
-            fixed_action = list(softmax(np.array(action[midpoint:])) * self.maximum_capacity)    
+        # midpoint = len(action) // 2
+        # fixed_action = []
+        #setting up trgs from their ind
+        # fixed_trgs = [self.graph_nodes[i] for i in action[:midpoint]]
+        fixed_trgs = [self.graph_nodes[action[0]]]
+        fixed_action = [action[1] * self.remaining_capacity / self.capacity_upper_scale_bound]
+        self.remaining_capacity = self.remaining_capacity - fixed_action[0]
+        # if len(action) != 0:
+        #     fixed_action = list(softmax(np.array(action[midpoint:])) * self.maximum_capacity)    
       
-        return fixed_trgs+fixed_action
+        return fixed_trgs + fixed_action
     
     def aggregate_and_standardize_action(self,action):
         """
@@ -562,10 +595,9 @@ class FeeEnv(gym.Env):
             self.graph_nodes.remove(self.src)
 
 
-
         self.simulator = simulator(mode=self.mode,
                                    src=self.src,
-                                   trgs=self.data['trgs'],
+                                   trgs=[],
                                    channel_ids=self.data['channel_ids'],
                                    active_channels=self.data['active_channels'],
                                    network_dictionary=self.data['network_dictionary'],
@@ -577,6 +609,8 @@ class FeeEnv(gym.Env):
                                    fixed_transactions=False,
                                    graph_nodes = self.graph_nodes,
                                    current_graph = sub_graph)
+        
+        
         
     def extract_graph_attributes(self, G, exclude_attributes=None):
         """
@@ -599,33 +633,47 @@ class FeeEnv(gym.Env):
         else:
             normalized_transaction_amounts = self.simulator.transaction_amounts / np.sum(self.simulator.transaction_amounts)
         trgs = [self.simulator.map_nodes_to_id[x] for x in self.simulator.trgs]
-  
+        
         #set node features
         nodes_list = list(G.nodes())
+
+
+        for e in G.edges(data=True):
+            node_features[self.simulator.map_nodes_to_id[e[0]]][7] = e[2]['balance']
+
         for i in range(len(G.nodes())):
             node_features[i][0] = degrees[nodes_list[i]]
             node_features[i][1] = eigenvectors[nodes_list[i]]
             node_features[i][3] = 0
             if i in trgs:
-                node_features[i][3] = 1
+                node_features[i][3] = self.simulator.network_dictionary[(self.src,nodes_list[i])][0]
             node_features[i][4] = normalized_transaction_amounts[i]
+
+            max_list = self.get_normalizer_configs()
+            node_features[i][5] = node_features[i][5]/max_list[0]
+            node_features[i][6] = node_features[i][6]/max_list[1]
+            node_features[i][7] = node_features[i][7]/max_list[2]
+
+        
         
         # Extract edge index
-        edge_index = np.array([(self.simulator.map_nodes_to_id[x],self.simulator.map_nodes_to_id[y]) for (x,y) in G.edges]).T
+        # edge_index = np.array([(self.simulator.map_nodes_to_id[x], self.simulator.map_nodes_to_id[y]) for (x,y) in G.edges]).T
 
 
         # Extract multiple edge attributes (excluding specified attributes)
-        max_list = self.get_normalizer_configs()
-        edge_attr_list = []
-        for e in G.edges(data=True):
-            filtered_attrs = {key: e[2][key] for key in e[2] if key not in exclude_attributes}
-            filtered_attrs = list(filtered_attrs.values())
-            edge_attr_list.append([filtered_attrs[i]/max_list[i] for i in range(len(max_list))])
-        edge_attr = np.array(edge_attr_list)
+        # max_list = self.get_normalizer_configs()
+        # edge_attr_list = []
+        # for e in G.edges(data=True):
+            # filtered_attrs = {key: e[2][key] for key in e[2] if key not in exclude_attributes}
+            # filtered_attrs = list(filtered_attrs.values())
+            # edge_attr_list.append([filtered_attrs[i]/max_list[i] for i in range(len(max_list))])
+        # edge_attr = np.array(edge_attr_list)
 
         # self.compare_and_update(edge_attr)
+        # return node_features, edge_index, edge_attr
 
-        return node_features, edge_index, edge_attr
+
+        return node_features
 
     def get_normalizer_configs(self):
         #return cap_max, base_max, rate_max

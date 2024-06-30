@@ -67,7 +67,9 @@ class simulator():
   def generate_transactions_dict(self, src, transaction_types, node_variables, active_providers):
     transactions_dict = dict()
     for (count, amount, epsilon) in transaction_types :
-        trs = generating_transactions.generate_transactions(src, amount, count, node_variables, epsilon, active_providers, verbose=False, exclude_src=True)
+        gaussian_distribution = np.random.normal(loc=amount, scale=np.sqrt(amount/2), size=1000)
+        sampled_amount = np.random.choice(gaussian_distribution)
+        trs = generating_transactions.generate_transactions(src, sampled_amount, count, node_variables, epsilon, active_providers, verbose=False, exclude_src=True)
         transactions_dict[amount] = trs
     return transactions_dict
 
@@ -144,6 +146,28 @@ class simulator():
     additive_channels, omitting_channels = self.delete_previous_action_differences(action, prev_action)
     self.add_to_network_and_active_channels(additive_channels)
     return additive_channels, omitting_channels
+  
+  def update_network_and_active_channels(self, action):
+        trg = action[0]
+        bal = action[1]
+        # [balance, fee_base, fee_rate, capacity]
+        if trg in self.trgs:
+          self.network_dictionary[(self.src, trg)][0] += bal
+          self.network_dictionary[(trg, self.src)][0] += bal
+          self.network_dictionary[(trg, self.src)][3] += 2*bal
+          self.network_dictionary[(trg, self.src)][3] += 2*bal
+          ommitive_channels = [trg]
+          
+        else:
+          self.trgs.append(trg)
+          self.network_dictionary[(self.src, trg)] = [bal, None, None, 2* bal]
+          self.network_dictionary[(trg, self.src)] = [bal, None, None, 2* bal]
+          ommitive_channels = []
+        self.active_channels[(self.src, trg)] = self.network_dictionary[(self.src, trg)]
+        self.active_channels[(trg, self.src)] = self.network_dictionary[(trg, self.src)]
+
+        return [trg, self.network_dictionary[(self.src, trg)][0]] , ommitive_channels
+     
   
   def delete_previous_action_differences(self, action, prev_action):
     """
@@ -287,7 +311,7 @@ class simulator():
         self.active_channels[(src,trg)][2] = beta
 
   def set_channels_fees(self, mode, fees, trgs) : # fees = [alpha1, alpha2, ..., alphan, beta1, beta2, ..., betan] ~ action (in fee setting)
-    n = len(self.trgs)
+    n = len(trgs)
 
     if mode == 'channel_openning':
           alphas = fees[:2*n]
@@ -357,8 +381,6 @@ class simulator():
           except:
              pass
           
-      
-    
     midpoint = len(fees) // 2
     fee_rates = fees[:midpoint]
     base_fees = fees[midpoint:]
@@ -370,6 +392,7 @@ class simulator():
           graph.add_edge(trg,self.src,weight = base_fees[2*i]*1000 + fee_rates[2*i]*amount) # to turn fee base to mili msat multiply to 1000
           graph.add_edge(self.src,trg,weight = base_fees[2*i + 1]*1000 + fee_rates[2*i + 1]*amount) # to turn fee base to mili msat multiply to 1000
           self.graphs_dict[amount] = graph
+
   def update_evolved_graph(self, fees, list_of_pairs):
 
     list_of_balances = self.get_list_of_balances(list_of_pairs)

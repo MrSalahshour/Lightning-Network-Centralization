@@ -255,7 +255,7 @@ def create_active_channels(network_dictionary, channels):
         active_channels[(trg, src)] = network_dictionary[(trg, src)]
     return active_channels
 
-def make_LN_graph(directed_edges, providers, manual_balance, src, trgs, channel_ids, capacities, initial_balances,):
+def make_LN_graph(directed_edges, providers, manual_balance, src, trgs, channel_ids, fee_policy_dict, capacities, initial_balances,):
     edges = initiate_balances(directed_edges)
     if manual_balance:
         edges = set_channels_balances(edges, src, trgs, channel_ids, capacities, initial_balances)
@@ -263,11 +263,13 @@ def make_LN_graph(directed_edges, providers, manual_balance, src, trgs, channel_
                                 edge_attr=['channel_id', 'capacity', 'fee_base_msat', 'fee_rate_milli_msat', 'balance'],
                                create_using=nx.DiGraph())
     
-    #NOTE: the node features vector is as follows: [degree_centrality, eigenvectors_centrality, is_provider, is_connected_to_us, normalized_transaction_amount]
+    #NOTE: the node features vector is as follows: [degree_centrality, eigenvectors_centrality, is_provider, is_connected_to_us, normalized_transaction_amount
+    #, avg fee base, avg fee rate, total budget]
     # degrees, closeness, eigenvectors = set_node_attributes(G)
     providers_nodes = list(set(providers))
+    
     for node in G.nodes():
-        G.nodes[node]["feature"] = np.array([0, 0, node in providers_nodes, 0, 0])
+        G.nodes[node]["feature"] = np.array([0, 0, node in providers_nodes, 0, 0, fee_policy_dict[node][0], fee_policy_dict[node][1], 0])
     return G
 
 def get_nodes_centralities(G):
