@@ -70,7 +70,7 @@ baselines:
 
 | Parameter              | Default | choices                                      |
 |------------------------|--------|----------------------------------------------|
-| _--strategy_            | static | random, top_k_betweenness     |
+| _--strategy_            | top_k_betweenness | random, top_k_betweenness     |
 
 
 
