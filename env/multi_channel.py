@@ -250,18 +250,18 @@ class FeeEnv(gym.Env):
         self.simulator.update_amount_graph(additive_channels, ommitive_channels,fees)
 
         fees_to_use_for_reward = fees[::2]
-        if self.time_step + 1 == self.max_episode_length :
-            reward = 0
+        # if self.time_step + 1 == self.max_episode_length :
+        #     reward = 0
             
-            for i in range(self.max_episode_length):
-                balances, transaction_amounts, transaction_numbers = self.simulate_transactions(fees,additive_channels)
-                reward += 1e-6 *(np.sum(np.multiply(fees_to_use_for_reward[0:self.n_channel], transaction_amounts) + \
-                        np.multiply(fees_to_use_for_reward[self.n_channel:], transaction_numbers)))
+        #     for i in range(self.max_episode_length):
+        #         balances, transaction_amounts, transaction_numbers = self.simulate_transactions(fees,additive_channels)
+        #         reward += 1e-6 *(np.sum(np.multiply(fees_to_use_for_reward[0:self.n_channel], transaction_amounts) + \
+        #                 np.multiply(fees_to_use_for_reward[self.n_channel:], transaction_numbers)))
 
-        else:
-            balances, transaction_amounts, transaction_numbers = self.simulate_transactions(fees,additive_channels)
-            reward = 1e-6 *(np.sum(np.multiply(fees_to_use_for_reward[0:self.n_channel], transaction_amounts ) + \
-                    np.multiply(fees_to_use_for_reward[self.n_channel:], transaction_numbers)))
+        # else:
+        balances, transaction_amounts, transaction_numbers = self.simulate_transactions(fees,additive_channels)
+        reward = 1e-6 *(np.sum(np.multiply(fees_to_use_for_reward[0:self.n_channel], transaction_amounts ) + \
+                np.multiply(fees_to_use_for_reward[self.n_channel:], transaction_numbers)))
 
         self.time_step += 1
         self.total_time_step+=1
@@ -436,8 +436,9 @@ class FeeEnv(gym.Env):
             
 
 
-    def get_local_graph(self,scale):
-        return self.simulator.current_graph
+    def get_local_graph(self, scale):
+        return self.simulator.get_local_graph(scale)
+        # return self.simulator.current_graph
     
     def set_undirected_attributed_LN_graph(self):
         undirected_G = nx.Graph(self.LN_graph)
