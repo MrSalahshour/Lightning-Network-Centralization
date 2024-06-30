@@ -41,12 +41,12 @@ All dependencies will be handled using the command :
 ### Run
 
 ```
-python3 -m scripts.ln_channel_oppening --algo PPO --tb_name PPO_tensorboard
+python3 -m scripts.ln_channel_opening --algo PPO --tb_name PPO_tensorboard
 python3 -m scripts.baselines --strategy random 
 ```
 
 ### Parameters
-ln_channel_oppening:
+ln_channel_opening:
 
 | Parameter              | Default | choices                                      |
 |------------------------|--------|----------------------------------------------|
