@@ -30,8 +30,8 @@ Please make sure you have installed `python3.8` or higher versions of python.
 
 
 ```
-git clone https://github.com/LightningCrashers/DyFEn
-cd DyFEn
+git clone https://github.com/AAhmadS/Lightning-Network-Centralization
+cd Lightning-Network-Centralization
 ```
 All dependencies will be handled using the command :
 
