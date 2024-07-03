@@ -574,10 +574,9 @@ class FeeEnv(gym.Env):
 
         active_channels = preprocessing.create_active_channels(network_dictionary, [])
 
-        try:
-            node_variables, active_providers, _ = preprocessing.init_node_params(sub_edges, sub_providers, verbose=False)
-        except:
-            node_variables, active_providers = None
+        node_variables, active_providers, _ = preprocessing.init_node_params(sub_edges, sub_providers, verbose=False)
+            
+        
             
 
 

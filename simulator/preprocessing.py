@@ -391,7 +391,10 @@ def init_node_params(edges, providers, verbose=False):
     """Initialize source and target distribution of each node in order to draw transaction at random later."""
     G = nx.from_pandas_edgelist(edges, source="src", target="trg", edge_attr=["capacity"], create_using=nx.DiGraph())
     active_providers = list(set(providers).intersection(set(G.nodes())))
-    active_ratio = len(active_providers) / len(providers)
+    if len(providers) == 0:
+        active_ratio = 0
+    else:
+        active_ratio = len(active_providers) / len(providers)
     if verbose:
         print("Total number of possible providers: %i" % len(providers))
         print("Ratio of active providers: %.2f" % active_ratio)
