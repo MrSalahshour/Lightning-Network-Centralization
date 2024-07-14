@@ -39,9 +39,9 @@ class simulator():
     self.support_onchain_rebalancing = support_onchain_rebalancing
     self.graph_nodes = graph_nodes
     self.current_graph = current_graph
-    
+    # self.shares = [] 
     self.transaction_amounts = np.zeros(len(self.graph_nodes))
-    self.map_nodes_to_id = dict(zip(self.graph_nodes, np.arange(len(node_variables))))
+    self.map_nodes_to_id = dict(zip(self.graph_nodes, np.arange(len(self.graph_nodes))))
 
     self.graphs_dict = self.generate_graphs_dict(transaction_types)
 
@@ -67,9 +67,9 @@ class simulator():
   def generate_transactions_dict(self, src, transaction_types, node_variables, active_providers):
     transactions_dict = dict()
     for (count, amount, epsilon) in transaction_types :
-        gaussian_distribution = np.random.normal(loc=amount, scale=np.sqrt(amount/2), size=1000)
-        sampled_amount = np.random.choice(gaussian_distribution)
-        trs = generating_transactions.generate_transactions(src, sampled_amount, count, node_variables, epsilon, active_providers, verbose=False, exclude_src=True)
+        # gaussian_distribution = np.random.normal(loc=amount, scale=np.sqrt(amount/2), size=1000)
+        # sampled_amount = np.random.choice(gaussian_distribution)
+        trs = generating_transactions.generate_transactions(src, amount, count, node_variables, epsilon, active_providers, verbose=False, exclude_src=True)
         transactions_dict[amount] = trs
     return transactions_dict
 
@@ -110,12 +110,12 @@ class simulator():
   def update_graphs(self, src, trg, transaction_amount):
       src_trg = self.network_dictionary[(src,trg)]
       src_trg_balance = src_trg[0] - transaction_amount
-      self.network_dictionary[(src,trg)][0] = src_trg_balance
       
       trg_src = self.network_dictionary[(trg,src)]
       trg_src_balance = trg_src[0] + transaction_amount
-      self.network_dictionary[(trg,src)][0] = trg_src_balance
       if src != self.src and trg != self.src:
+        self.network_dictionary[(src,trg)][0] = src_trg_balance
+        self.network_dictionary[(trg,src)][0] = trg_src_balance
         self.current_graph[src][trg]['balance'] = src_trg_balance
         self.current_graph[trg][src]['balance'] = trg_src_balance
       
@@ -141,11 +141,11 @@ class simulator():
         self.active_channels[(src,trg)][0] = self.active_channels[(src,trg)][0] - transaction_amount
         self.active_channels[(trg,src)][0] = self.active_channels[(trg,src)][0] + transaction_amount
         
-  def update_network_and_active_channels(self, action, prev_action):
+  # def update_network_and_active_channels(self, action, prev_action):
 
-    additive_channels, omitting_channels = self.delete_previous_action_differences(action, prev_action)
-    self.add_to_network_and_active_channels(additive_channels)
-    return additive_channels, omitting_channels
+  #   additive_channels, omitting_channels = self.delete_previous_action_differences(action, prev_action)
+  #   self.add_to_network_and_active_channels(additive_channels)
+  #   return additive_channels, omitting_channels
   
   def update_network_and_active_channels(self, action):
         trg = action[0]
@@ -155,7 +155,7 @@ class simulator():
           self.network_dictionary[(self.src, trg)][0] += bal
           self.network_dictionary[(trg, self.src)][0] += bal
           self.network_dictionary[(trg, self.src)][3] += 2*bal
-          self.network_dictionary[(trg, self.src)][3] += 2*bal
+          self.network_dictionary[(self.src, trg)][3] += 2*bal
           ommitive_channels = [trg]
           
         else:
@@ -244,10 +244,7 @@ class simulator():
       
   def evolve_network_dict(self, src, trg, fee_base_src, fee_rate_src,fee_base_trg,fee_rate_trg, bal):
      self.network_dictionary[(src, trg)] = [2*bal, fee_base_src, fee_rate_src, bal]
-     self.network_dictionary[(trg, src)] = [2*bal, fee_base_trg, fee_rate_trg, bal]
-
-     self.active_channels[(src, trg)] = self.network_dictionary[(src, trg)]
-     self.active_channels[(trg, src)] = self.network_dictionary[(trg, src)]     
+     self.network_dictionary[(trg, src)] = [2*bal, fee_base_trg, fee_rate_trg, bal]    
       
 
 
@@ -268,8 +265,7 @@ class simulator():
       for i in range(len(path)-1) :
         src = path[i] 
         trg = path[i+1]
-        if (self.is_active_channel(src, trg)) :
-          self.update_active_channels(src,trg,transaction_amount)
+        # self.update_active_channels(src, trg, transaction_amount)
         self.update_graphs(src, trg, transaction_amount)
         if src != self.src:
           self.transaction_amounts[self.map_nodes_to_id[src]] += transaction_amount
@@ -363,6 +359,7 @@ class simulator():
   
   #TODO: #20 edges should be added to and deleted from digraph
   def update_amount_graph(self, additive_channels, omitting_channels, fees):
+
     midpoint = len(additive_channels) // 2
     additive_trg = additive_channels[:midpoint]
     additive_bal = additive_channels[midpoint:]
@@ -389,8 +386,8 @@ class simulator():
       trg, bal = additive_trg[i], additive_bal[i]
       for amount, graph in self.graphs_dict.items():
         if bal >= amount:
-          graph.add_edge(trg,self.src,weight = base_fees[2*i]*1000 + fee_rates[2*i]*amount) # to turn fee base to mili msat multiply to 1000
-          graph.add_edge(self.src,trg,weight = base_fees[2*i + 1]*1000 + fee_rates[2*i + 1]*amount) # to turn fee base to mili msat multiply to 1000
+          graph.add_edge(trg, self.src, weight = base_fees[2*i]*1000 + fee_rates[2*i]*amount) # to turn fee base to mili msat multiply to 1000
+          graph.add_edge(self.src, trg, weight = base_fees[2*i + 1]*1000 + fee_rates[2*i + 1]*amount) # to turn fee base to mili msat multiply to 1000
           self.graphs_dict[amount] = graph
 
   def update_evolved_graph(self, fees, list_of_pairs):

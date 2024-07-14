@@ -35,7 +35,7 @@ def make_agent(env, algo, device, tb_log_dir):
         )
         # Instantiate the PPO agent with the custom policy
         # model = PPO(policy, env, device=device, tensorboard_log=tb_log_dir,rollout_buffer_class = MyCustomDictRolloutBuffer, policy_kwargs=policy_kwargs, verbose=1)
-        model = PPO(policy, env, verbose=1, device=device, tensorboard_log=tb_log_dir)
+        model = PPO(policy, env, verbose=1, device=device, tensorboard_log=tb_log_dir, n_steps=7, batch_size=7, gamma=1)
     elif algo == "TRPO":
         from sb3_contrib import TRPO
         model = TRPO(policy, env, verbose=1, device=device, tensorboard_log=tb_log_dir)
