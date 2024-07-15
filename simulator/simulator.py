@@ -39,7 +39,7 @@ class simulator():
     self.support_onchain_rebalancing = support_onchain_rebalancing
     self.graph_nodes = graph_nodes
     self.current_graph = current_graph
-    # self.shares = [] 
+    self.shares = [] 
     self.transaction_amounts = np.zeros(len(self.graph_nodes))
     self.map_nodes_to_id = dict(zip(self.graph_nodes, np.arange(len(self.graph_nodes))))
 
@@ -141,32 +141,32 @@ class simulator():
         self.active_channels[(src,trg)][0] = self.active_channels[(src,trg)][0] - transaction_amount
         self.active_channels[(trg,src)][0] = self.active_channels[(trg,src)][0] + transaction_amount
         
-  # def update_network_and_active_channels(self, action, prev_action):
+  def update_network_and_active_channels(self, action, prev_action):
 
-  #   additive_channels, omitting_channels = self.delete_previous_action_differences(action, prev_action)
-  #   self.add_to_network_and_active_channels(additive_channels)
-  #   return additive_channels, omitting_channels
+    additive_channels, omitting_channels = self.delete_previous_action_differences(action, prev_action)
+    self.add_to_network_and_active_channels(additive_channels)
+    return additive_channels, omitting_channels
   
-  def update_network_and_active_channels(self, action):
-        trg = action[0]
-        bal = action[1]
-        # [balance, fee_base, fee_rate, capacity]
-        if trg in self.trgs:
-          self.network_dictionary[(self.src, trg)][0] += bal
-          self.network_dictionary[(trg, self.src)][0] += bal
-          self.network_dictionary[(trg, self.src)][3] += 2*bal
-          self.network_dictionary[(self.src, trg)][3] += 2*bal
-          ommitive_channels = [trg]
+  # def update_network_and_active_channels(self, action):
+  #       trg = action[0]
+  #       bal = action[1]
+  #       # [balance, fee_base, fee_rate, capacity]
+  #       if trg in self.trgs:
+  #         self.network_dictionary[(self.src, trg)][0] += bal
+  #         self.network_dictionary[(trg, self.src)][0] += bal
+  #         self.network_dictionary[(trg, self.src)][3] += 2*bal
+  #         self.network_dictionary[(self.src, trg)][3] += 2*bal
+  #         ommitive_channels = [trg]
           
-        else:
-          self.trgs.append(trg)
-          self.network_dictionary[(self.src, trg)] = [bal, None, None, 2* bal]
-          self.network_dictionary[(trg, self.src)] = [bal, None, None, 2* bal]
-          ommitive_channels = []
-        self.active_channels[(self.src, trg)] = self.network_dictionary[(self.src, trg)]
-        self.active_channels[(trg, self.src)] = self.network_dictionary[(trg, self.src)]
+  #       else:
+  #         self.trgs.append(trg)
+  #         self.network_dictionary[(self.src, trg)] = [bal, None, None, 2* bal]
+  #         self.network_dictionary[(trg, self.src)] = [bal, None, None, 2* bal]
+  #         ommitive_channels = []
+  #       self.active_channels[(self.src, trg)] = self.network_dictionary[(self.src, trg)]
+  #       self.active_channels[(trg, self.src)] = self.network_dictionary[(trg, self.src)]
 
-        return [trg, self.network_dictionary[(self.src, trg)][0]] , ommitive_channels
+  #       return [trg, self.network_dictionary[(self.src, trg)][0]] , ommitive_channels
      
   
   def delete_previous_action_differences(self, action, prev_action):
@@ -465,6 +465,7 @@ class simulator():
     for (count,amount,epsilon) in self.transaction_types:
         trs = self.run_simulation_for_each_transaction_type(count, amount, epsilon ,action)
         output_transactions_dict[amount] = trs
+    
     return output_transactions_dict
    
 
@@ -478,6 +479,7 @@ class simulator():
         transactions = self.transactions_dict[amount]
       else :
         transactions = generating_transactions.generate_transactions(self.src, amount, count, self.node_variables, epsilon, self.active_providers, verbose=False, exclude_src=True)
+      print(transactions)
       transactions = transactions.assign(path=None)
       transactions['path'] = transactions['path'].astype('object')
       for index, transaction in transactions.iterrows(): 

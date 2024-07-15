@@ -130,9 +130,10 @@ def get_fire_forest_sample(G, reverse_mapping, sample_size, burning_prob=0.7):
 
     
     # Step 2: Apply the ForestFireSampler to the undirected graph
+    random.seed(10)
     forestFireSampler = ForestFireSampler(number_of_nodes=sample_size, p=burning_prob,
                                            max_visited_nodes_backlog=100, restart_hop_size=10)
-    random.seed(10)
+    
     # Wrapper around the sample method
     def wrapped_sample(graph):
         def modified_start_a_fire(graph):
@@ -315,7 +316,7 @@ def create_sub_network(directed_edges, providers, src, trgs, channel_ids, local_
     return network_dictionary, sub_nodes, sub_providers, sub_edges
 
 def get_sub_graph_properties(G,sub_nodes,providers):
-
+    
     sub_providers = list(set(sub_nodes) & set(providers))
     sub_graph = G.subgraph(sub_nodes).copy()
     degrees, _ = get_nodes_centralities(G)

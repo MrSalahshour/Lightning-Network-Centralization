@@ -14,9 +14,11 @@ def sample_providers(src, K, node_variables, active_providers, exclude_src=True)
         nodes = list(provider_records["pub_key"])
 
       probas = list(provider_records["degree"] / provider_records["degree"].sum())
+      np.random.seed()
       return np.random.choice(nodes, size=K, replace=True, p=probas)
 
 def generate_transactions(src, amount_in_satoshi, K, node_variables, epsilon, active_providers, verbose=False, exclude_src=True):
+      np.random.seed()
       if exclude_src :
         if src in set(node_variables['pub_key']):
            nodes = list(set(node_variables['pub_key']) - set([src]))

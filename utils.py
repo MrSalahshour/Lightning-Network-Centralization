@@ -18,6 +18,8 @@ import graph_embedding_processing
 from sklearn.model_selection import train_test_split
 from model.GATv2_feature_extractor import CustomGATv2Extractor
 from model.custom_buffer import MyCustomDictRolloutBuffer
+from stable_baselines3.common.env_util import make_vec_env
+
 
 
 def make_agent(env, algo, device, tb_log_dir):
@@ -29,13 +31,17 @@ def make_agent(env, algo, device, tb_log_dir):
     if algo == "PPO":
         from stable_baselines3 import PPO
         # Create the custom policy
+        # policy_kwargs = dict(
+        #     features_extractor_class=CustomGATv2Extractor,
+        #     features_extractor_kwargs=dict(features_dim=64),
+        # )
+        custom_arch = [256, 128, 128, 64]
         policy_kwargs = dict(
-            features_extractor_class=CustomGATv2Extractor,
-            features_extractor_kwargs=dict(features_dim=64),
+            net_arch=custom_arch
         )
         # Instantiate the PPO agent with the custom policy
         # model = PPO(policy, env, device=device, tensorboard_log=tb_log_dir,rollout_buffer_class = MyCustomDictRolloutBuffer, policy_kwargs=policy_kwargs, verbose=1)
-        model = PPO(policy, env, verbose=1, device=device, tensorboard_log=tb_log_dir, n_steps=7, batch_size=7, gamma=1)
+        model = PPO(policy, env, verbose=1, device=device, tensorboard_log=tb_log_dir, n_steps=7, batch_size=28, gamma=1, policy_kwargs=policy_kwargs)
     elif algo == "TRPO":
         from sb3_contrib import TRPO
         model = TRPO(policy, env, verbose=1, device=device, tensorboard_log=tb_log_dir)
@@ -63,7 +69,7 @@ def make_agent(env, algo, device, tb_log_dir):
     return model
 
 
-def make_env(data, env_params, seed):
+def make_env(data, env_params, seed, multiple_env):
 
     assert len(env_params['counts']) == len(env_params['amounts']) and len(env_params['counts']) == len(
         env_params['epsilons']), "number of transaction types missmatch"
@@ -75,11 +81,17 @@ def make_env(data, env_params, seed):
     , data["trgs"], data["channel_ids"], data['fee_policy'], env_params['capacities'], env_params['initial_balances'])
 
    
-
-    env = FeeEnv(env_params["mode"],data,env_params['max_capacity'], env_params['fee_base_upper_bound']
-                , env_params['max_episode_length'],len(env_params['counts']),env_params['counts'],
-                env_params['amounts'], env_params['epsilons'],env_params['capacity_upper_scale_bound'],
-                seed,G)
+    if multiple_env == False:
+        env = FeeEnv(env_params["mode"],data,env_params['max_capacity'], env_params['fee_base_upper_bound']
+                    , env_params['max_episode_length'], len(env_params['counts']), env_params['counts'],
+                    env_params['amounts'], env_params['epsilons'],env_params['capacity_upper_scale_bound'],
+                    seed,G)
+    else:
+        env = make_vec_env(FeeEnv, n_envs = 4, env_kwargs=dict(mode = env_params["mode"] , data = data, 
+        max_capacity = env_params['max_capacity'], fee_base_upper_bound = env_params['fee_base_upper_bound'],
+        max_episode_length = env_params['max_episode_length'],number_of_transaction_types = len(env_params['counts']),
+        counts = env_params['counts'], amounts = env_params['amounts'], epsilons = env_params['epsilons'],
+        capacity_upper_scale_bound = env_params['capacity_upper_scale_bound'],seed = seed, LN_graph = G))
 
 
     return env
