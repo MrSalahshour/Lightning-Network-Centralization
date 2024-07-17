@@ -19,6 +19,7 @@ from sklearn.model_selection import train_test_split
 from model.GATv2_feature_extractor import CustomGATv2Extractor
 from model.custom_buffer import MyCustomDictRolloutBuffer
 from stable_baselines3.common.env_util import make_vec_env
+from model.Transformer_feature_extractor import CustomTransformer
 
 
 
@@ -35,12 +36,13 @@ def make_agent(env, algo, device, tb_log_dir):
         #     features_extractor_class=CustomGATv2Extractor,
         #     features_extractor_kwargs=dict(features_dim=64),
         # )
-        custom_arch = [256, 128, 128, 64]
         policy_kwargs = dict(
-            net_arch=custom_arch
+            features_extractor_class=CustomTransformer,
+            features_extractor_kwargs=dict(features_dim=128, embed_dim=128, nhead=4, num_layers=3),
         )
         # Instantiate the PPO agent with the custom policy
-        # model = PPO(policy, env, device=device, tensorboard_log=tb_log_dir,rollout_buffer_class = MyCustomDictRolloutBuffer, policy_kwargs=policy_kwargs, verbose=1)
+        # model = PPO(policy, env, device=device, tensorboard_log=tb_log_dir,rollout_buffer_class
+        # = MyCustomDictRolloutBuffer, policy_kwargs=policy_kwargs, verbose=1)
         model = PPO(policy, env, verbose=1, device=device, tensorboard_log=tb_log_dir, n_steps=5, batch_size=20, gamma=1, policy_kwargs=policy_kwargs)
     elif algo == "TRPO":
         from sb3_contrib import TRPO
