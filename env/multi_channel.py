@@ -718,8 +718,8 @@ class FeeEnv(gym.Env):
                 # print("Target node : ",nodes_list[i])
                 # print("trgs:", self.simulator.trgs)
                 node_features[i][2] = self.simulator.network_dictionary[(self.src,nodes_list[i])][0] / self.max_capacity
-            #     node_features[i][4] = transaction_amounts[trgs.index(i)] / max_list[3]
-            # node_features[i][5] = normalized_transaction_amounts[i]
+                node_features[i][4] = transaction_amounts[trgs.index(i)] / max_list[3]
+            node_features[i][5] = normalized_transaction_amounts[i]
 
             # node_features[i][5] = node_features[i][5]/max_list[0]
             # node_features[i][6] = node_features[i][6]/max_list[1]

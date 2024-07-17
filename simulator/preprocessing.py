@@ -270,7 +270,7 @@ def make_LN_graph(directed_edges, providers, manual_balance, src, trgs, channel_
     providers_nodes = list(set(providers))
     
     for node in G.nodes():
-        G.nodes[node]["feature"] = np.array([0, node in providers_nodes, 0,  0])
+        G.nodes[node]["feature"] = np.array([0, node in providers_nodes, 0,  0, 0, 0])
     return G
 
 def get_nodes_centralities(G):

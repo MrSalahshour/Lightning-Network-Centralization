@@ -41,7 +41,7 @@ def make_agent(env, algo, device, tb_log_dir):
         )
         # Instantiate the PPO agent with the custom policy
         # model = PPO(policy, env, device=device, tensorboard_log=tb_log_dir,rollout_buffer_class = MyCustomDictRolloutBuffer, policy_kwargs=policy_kwargs, verbose=1)
-        model = PPO(policy, env, verbose=1, device=device, tensorboard_log=tb_log_dir, n_steps=7, batch_size=28, gamma=1, policy_kwargs=policy_kwargs)
+        model = PPO(policy, env, verbose=1, device=device, tensorboard_log=tb_log_dir, n_steps=5, batch_size=20, gamma=1, policy_kwargs=policy_kwargs)
     elif algo == "TRPO":
         from sb3_contrib import TRPO
         model = TRPO(policy, env, verbose=1, device=device, tensorboard_log=tb_log_dir)
@@ -226,28 +226,28 @@ def get_fee_based_on_strategy(state, strategy, directed_edges, node_index):
         raise NotImplementedError
     return action, rescale
 
-def get_channels_and_capacities_based_on_strategy(strategy,capacity_upper_scale_bound,n_channels,n_nodes, src,graph_nodes, graph):
+def get_channels_and_capacities_based_on_strategy(strategy, capacity_upper_scale_bound, n_channels,
+                                                   n_nodes, src, graph_nodes, graph, time_step):
     if strategy == 'random':
-        action = get_random_channels_and_capacities(capacity_upper_scale_bound,n_channels,n_nodes)
+        action = get_random_channels_and_capacities(capacity_upper_scale_bound, n_channels, n_nodes)
     if strategy == 'top_k_betweenness':
-        action = get_top_k_betweenness(capacity_upper_scale_bound,n_channels,src,graph_nodes,graph)
+        action = get_top_k_betweenness(capacity_upper_scale_bound, n_channels, src, graph_nodes, graph, time_step)
     #TODO: define basline strategy for random choose channels and capacities index.
 
     return action
 
-def get_top_k_betweenness(scale, n_channels, src, graph_nodes, graph,alpha=2):
+def get_top_k_betweenness(scale, n_channels, src, graph_nodes, graph, time_step, alpha=2):
      nodes_by_betweenness = nx.betweenness_centrality(graph)
-     if src in nodes_by_betweenness:
-         del nodes_by_betweenness[src]
      sorted_by_betweenness = dict(sorted(nodes_by_betweenness.items(), key=lambda item: item[1]))
-     top_k_betweenness = list(sorted_by_betweenness.keys())[:n_channels]
+     top_k_betweenness = list(sorted_by_betweenness.keys())[-n_channels:]
+
      top_k_betweenness = [graph_nodes.index(item) for item in top_k_betweenness if item in graph_nodes]
     #  top_k_capacity = list(sorted_by_betweenness.values())[-n_channels:]
     #  top_k_capacity = [round(scale*(elem+alpha*max(top_k_capacity))/(sum(top_k_capacity)+n_channels*alpha*max(top_k_capacity))) for elem in top_k_capacity]
-
+     scale = 5
      top_k_capacity  = [scale] * n_channels
      
-     return top_k_betweenness + top_k_capacity
+     return [top_k_betweenness[time_step]] + [top_k_capacity[time_step]]
      
 def get_random_channels_and_capacities(capacity_upper_scale_bound,n_channels,n_nodes):
     if n_nodes < n_channels:
