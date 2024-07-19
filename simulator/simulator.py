@@ -39,9 +39,9 @@ class simulator():
     self.support_onchain_rebalancing = support_onchain_rebalancing
     self.graph_nodes = graph_nodes
     self.current_graph = current_graph
-    
+    self.shares = [] 
     self.transaction_amounts = np.zeros(len(self.graph_nodes))
-    self.map_nodes_to_id = dict(zip(self.graph_nodes, np.arange(len(node_variables))))
+    self.map_nodes_to_id = dict(zip(self.graph_nodes, np.arange(len(self.graph_nodes))))
 
     self.graphs_dict = self.generate_graphs_dict(transaction_types)
 
@@ -67,9 +67,9 @@ class simulator():
   def generate_transactions_dict(self, src, transaction_types, node_variables, active_providers):
     transactions_dict = dict()
     for (count, amount, epsilon) in transaction_types :
-        gaussian_distribution = np.random.normal(loc=amount, scale=np.sqrt(amount/2), size=1000)
-        sampled_amount = np.random.choice(gaussian_distribution)
-        trs = generating_transactions.generate_transactions(src, sampled_amount, count, node_variables, epsilon, active_providers, verbose=False, exclude_src=True)
+        # gaussian_distribution = np.random.normal(loc=amount, scale=np.sqrt(amount/2), size=1000)
+        # sampled_amount = np.random.choice(gaussian_distribution)
+        trs = generating_transactions.generate_transactions(src, amount, count, node_variables, epsilon, active_providers, verbose=False, exclude_src=True)
         transactions_dict[amount] = trs
     return transactions_dict
 
@@ -110,12 +110,12 @@ class simulator():
   def update_graphs(self, src, trg, transaction_amount):
       src_trg = self.network_dictionary[(src,trg)]
       src_trg_balance = src_trg[0] - transaction_amount
-      self.network_dictionary[(src,trg)][0] = src_trg_balance
       
       trg_src = self.network_dictionary[(trg,src)]
       trg_src_balance = trg_src[0] + transaction_amount
-      self.network_dictionary[(trg,src)][0] = trg_src_balance
       if src != self.src and trg != self.src:
+        self.network_dictionary[(src,trg)][0] = src_trg_balance
+        self.network_dictionary[(trg,src)][0] = trg_src_balance
         self.current_graph[src][trg]['balance'] = src_trg_balance
         self.current_graph[trg][src]['balance'] = trg_src_balance
       
@@ -147,26 +147,26 @@ class simulator():
     self.add_to_network_and_active_channels(additive_channels)
     return additive_channels, omitting_channels
   
-  def update_network_and_active_channels(self, action):
-        trg = action[0]
-        bal = action[1]
-        # [balance, fee_base, fee_rate, capacity]
-        if trg in self.trgs:
-          self.network_dictionary[(self.src, trg)][0] += bal
-          self.network_dictionary[(trg, self.src)][0] += bal
-          self.network_dictionary[(trg, self.src)][3] += 2*bal
-          self.network_dictionary[(trg, self.src)][3] += 2*bal
-          ommitive_channels = [trg]
+  # def update_network_and_active_channels(self, action):
+  #       trg = action[0]
+  #       bal = action[1]
+  #       # [balance, fee_base, fee_rate, capacity]
+  #       if trg in self.trgs:
+  #         self.network_dictionary[(self.src, trg)][0] += bal
+  #         self.network_dictionary[(trg, self.src)][0] += bal
+  #         self.network_dictionary[(trg, self.src)][3] += 2*bal
+  #         self.network_dictionary[(self.src, trg)][3] += 2*bal
+  #         ommitive_channels = [trg]
           
-        else:
-          self.trgs.append(trg)
-          self.network_dictionary[(self.src, trg)] = [bal, None, None, 2* bal]
-          self.network_dictionary[(trg, self.src)] = [bal, None, None, 2* bal]
-          ommitive_channels = []
-        self.active_channels[(self.src, trg)] = self.network_dictionary[(self.src, trg)]
-        self.active_channels[(trg, self.src)] = self.network_dictionary[(trg, self.src)]
+  #       else:
+  #         self.trgs.append(trg)
+  #         self.network_dictionary[(self.src, trg)] = [bal, None, None, 2* bal]
+  #         self.network_dictionary[(trg, self.src)] = [bal, None, None, 2* bal]
+  #         ommitive_channels = []
+  #       self.active_channels[(self.src, trg)] = self.network_dictionary[(self.src, trg)]
+  #       self.active_channels[(trg, self.src)] = self.network_dictionary[(trg, self.src)]
 
-        return [trg, self.network_dictionary[(self.src, trg)][0]] , ommitive_channels
+  #       return [trg, self.network_dictionary[(self.src, trg)][0]] , ommitive_channels
      
   
   def delete_previous_action_differences(self, action, prev_action):
@@ -244,32 +244,39 @@ class simulator():
       
   def evolve_network_dict(self, src, trg, fee_base_src, fee_rate_src,fee_base_trg,fee_rate_trg, bal):
      self.network_dictionary[(src, trg)] = [2*bal, fee_base_src, fee_rate_src, bal]
-     self.network_dictionary[(trg, src)] = [2*bal, fee_base_trg, fee_rate_trg, bal]
-
-     self.active_channels[(src, trg)] = self.network_dictionary[(src, trg)]
-     self.active_channels[(trg, src)] = self.network_dictionary[(trg, src)]     
+     self.network_dictionary[(trg, src)] = [2*bal, fee_base_trg, fee_rate_trg, bal]    
       
 
 
   def get_local_graph(self, scale):
     # self.sync_network_dictionary()
-    graph = nx.DiGraph()
+    # graph = nx.DiGraph()
 
-    for key in self.network_dictionary :
-      val = self.network_dictionary[key]
-      # val[0] represents balance key[0] src and key[1] target, val[1] is fee_rate and val[2] is fee_base
-      graph.add_edge(key[0],key[1],weight = val[1]*scale + val[2])
+    # for key in self.network_dictionary :
+    #   val = self.network_dictionary[key]
+    #   # val[0] represents balance key[0] src and key[1] target, val[1] is fee_rate and val[2] is fee_base
+    #   graph.add_edge(key[0],key[1],weight = val[1]*scale + val[2])
+
+    edges = self.current_graph.edges()
+
+    # Step 4: Create a new weighted directed graph
+    weighted_G = nx.DiGraph()
+
+    # Add edges with computed weights to the new graph
+    for src, trg in edges:
+        val = self.network_dictionary[(src,trg)]
+        weight = val[1]*scale + val[2]
+        weighted_G.add_edge(src, trg, weight=weight)
     
     # assert self.src in self.network_dictionary
-    return graph
+    return weighted_G
     
 
   def update_network_data(self, path, transaction_amount):
       for i in range(len(path)-1) :
         src = path[i] 
         trg = path[i+1]
-        if (self.is_active_channel(src, trg)) :
-          self.update_active_channels(src,trg,transaction_amount)
+        # self.update_active_channels(src, trg, transaction_amount)
         self.update_graphs(src, trg, transaction_amount)
         if src != self.src:
           self.transaction_amounts[self.map_nodes_to_id[src]] += transaction_amount
@@ -363,6 +370,7 @@ class simulator():
   
   #TODO: #20 edges should be added to and deleted from digraph
   def update_amount_graph(self, additive_channels, omitting_channels, fees):
+
     midpoint = len(additive_channels) // 2
     additive_trg = additive_channels[:midpoint]
     additive_bal = additive_channels[midpoint:]
@@ -389,8 +397,8 @@ class simulator():
       trg, bal = additive_trg[i], additive_bal[i]
       for amount, graph in self.graphs_dict.items():
         if bal >= amount:
-          graph.add_edge(trg,self.src,weight = base_fees[2*i]*1000 + fee_rates[2*i]*amount) # to turn fee base to mili msat multiply to 1000
-          graph.add_edge(self.src,trg,weight = base_fees[2*i + 1]*1000 + fee_rates[2*i + 1]*amount) # to turn fee base to mili msat multiply to 1000
+          graph.add_edge(trg, self.src, weight = base_fees[2*i]*1000 + fee_rates[2*i]*amount) # to turn fee base to mili msat multiply to 1000
+          graph.add_edge(self.src, trg, weight = base_fees[2*i + 1]*1000 + fee_rates[2*i + 1]*amount) # to turn fee base to mili msat multiply to 1000
           self.graphs_dict[amount] = graph
 
   def update_evolved_graph(self, fees, list_of_pairs):
@@ -468,6 +476,7 @@ class simulator():
     for (count,amount,epsilon) in self.transaction_types:
         trs = self.run_simulation_for_each_transaction_type(count, amount, epsilon ,action)
         output_transactions_dict[amount] = trs
+    
     return output_transactions_dict
    
 

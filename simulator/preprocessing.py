@@ -130,9 +130,10 @@ def get_fire_forest_sample(G, reverse_mapping, sample_size, burning_prob=0.7):
 
     
     # Step 2: Apply the ForestFireSampler to the undirected graph
+    random.seed(10)
     forestFireSampler = ForestFireSampler(number_of_nodes=sample_size, p=burning_prob,
                                            max_visited_nodes_backlog=100, restart_hop_size=10)
-    random.seed()
+    
     # Wrapper around the sample method
     def wrapped_sample(graph):
         def modified_start_a_fire(graph):
@@ -178,7 +179,7 @@ def get_fire_forest_sample(G, reverse_mapping, sample_size, burning_prob=0.7):
                 return sampled_nodes
             else:
                 print("Resampling due to insufficient sample size.")
-                random.seed()
+                random.seed(17)
     
     sampled_numeric_undirected_G = wrapped_sample(G)
     # Map back to original node labels
@@ -263,18 +264,19 @@ def make_LN_graph(directed_edges, providers, manual_balance, src, trgs, channel_
                                 edge_attr=['channel_id', 'capacity', 'fee_base_msat', 'fee_rate_milli_msat', 'balance'],
                                create_using=nx.DiGraph())
     
-    #NOTE: the node features vector is as follows: [degree_centrality, eigenvectors_centrality, is_provider, is_connected_to_us, normalized_transaction_amount
-    #, avg fee base, avg fee rate, total budget]
+    #NOTE: the node features vector is as follows: [degree_centrality, is_provider, is_connected_to_us,
+    # total budget, transaction amount]
     # degrees, closeness, eigenvectors = set_node_attributes(G)
     providers_nodes = list(set(providers))
     
     for node in G.nodes():
-        G.nodes[node]["feature"] = np.array([0, 0, node in providers_nodes, 0, 0, fee_policy_dict[node][0], fee_policy_dict[node][1], 0])
+        G.nodes[node]["feature"] = np.array([0, node in providers_nodes, 0,  0, 0, 0])
     return G
 
 def get_nodes_centralities(G):
     degrees = nx.degree_centrality(G)
-    eigenvectors = get_eigenvector_centrality(G, degrees)
+    # eigenvectors = get_eigenvector_centrality(G, degrees)
+    eigenvectors = 0
     return degrees, eigenvectors
 
 def get_eigenvector_centrality(G, degree_centrality):
@@ -314,13 +316,13 @@ def create_sub_network(directed_edges, providers, src, trgs, channel_ids, local_
     return network_dictionary, sub_nodes, sub_providers, sub_edges
 
 def get_sub_graph_properties(G,sub_nodes,providers):
-
+    
     sub_providers = list(set(sub_nodes) & set(providers))
     sub_graph = G.subgraph(sub_nodes).copy()
-    degrees, eigenvectors = get_nodes_centralities(G)
+    degrees, _ = get_nodes_centralities(G)
     #set centrality of nodes
     for node in G.nodes():
-        G.nodes[node]["feature"][:2] = degrees[node], eigenvectors[node]
+        G.nodes[node]["feature"][0] = degrees[node]
         
     sub_edges = nx.to_pandas_edgelist(sub_graph)
     sub_edges = sub_edges.rename(columns={'source': 'src', 'target': 'trg'})    
@@ -391,7 +393,10 @@ def init_node_params(edges, providers, verbose=False):
     """Initialize source and target distribution of each node in order to draw transaction at random later."""
     G = nx.from_pandas_edgelist(edges, source="src", target="trg", edge_attr=["capacity"], create_using=nx.DiGraph())
     active_providers = list(set(providers).intersection(set(G.nodes())))
-    active_ratio = len(active_providers) / len(providers)
+    if len(providers) == 0:
+        active_ratio = 0
+    else:
+        active_ratio = len(active_providers) / len(providers)
     if verbose:
         print("Total number of possible providers: %i" % len(providers))
         print("Ratio of active providers: %.2f" % active_ratio)

@@ -18,6 +18,9 @@ import graph_embedding_processing
 from sklearn.model_selection import train_test_split
 from model.GATv2_feature_extractor import CustomGATv2Extractor
 from model.custom_buffer import MyCustomDictRolloutBuffer
+from stable_baselines3.common.env_util import make_vec_env
+from model.Transformer_feature_extractor import CustomTransformer
+
 
 
 def make_agent(env, algo, device, tb_log_dir):
@@ -29,13 +32,18 @@ def make_agent(env, algo, device, tb_log_dir):
     if algo == "PPO":
         from stable_baselines3 import PPO
         # Create the custom policy
+        # policy_kwargs = dict(
+        #     features_extractor_class=CustomGATv2Extractor,
+        #     features_extractor_kwargs=dict(features_dim=64),
+        # )
         policy_kwargs = dict(
-            features_extractor_class=CustomGATv2Extractor,
-            features_extractor_kwargs=dict(features_dim=64),
+            features_extractor_class=CustomTransformer,
+            features_extractor_kwargs=dict(features_dim=128, embed_dim=128, nhead=4, num_layers=3),
         )
         # Instantiate the PPO agent with the custom policy
-        # model = PPO(policy, env, device=device, tensorboard_log=tb_log_dir,rollout_buffer_class = MyCustomDictRolloutBuffer, policy_kwargs=policy_kwargs, verbose=1)
-        model = PPO(policy, env, verbose=1, device=device, tensorboard_log=tb_log_dir)
+        # model = PPO(policy, env, device=device, tensorboard_log=tb_log_dir,rollout_buffer_class
+        # = MyCustomDictRolloutBuffer, policy_kwargs=policy_kwargs, verbose=1)
+        model = PPO(policy, env, verbose=1, device=device, tensorboard_log=tb_log_dir, n_steps=5, batch_size=20, gamma=1, policy_kwargs=policy_kwargs)
     elif algo == "TRPO":
         from sb3_contrib import TRPO
         model = TRPO(policy, env, verbose=1, device=device, tensorboard_log=tb_log_dir)
@@ -63,7 +71,7 @@ def make_agent(env, algo, device, tb_log_dir):
     return model
 
 
-def make_env(data, env_params, seed):
+def make_env(data, env_params, seed, multiple_env):
 
     assert len(env_params['counts']) == len(env_params['amounts']) and len(env_params['counts']) == len(
         env_params['epsilons']), "number of transaction types missmatch"
@@ -75,11 +83,17 @@ def make_env(data, env_params, seed):
     , data["trgs"], data["channel_ids"], data['fee_policy'], env_params['capacities'], env_params['initial_balances'])
 
    
-
-    env = FeeEnv(env_params["mode"],data,env_params['max_capacity'], env_params['fee_base_upper_bound']
-                , env_params['max_episode_length'],len(env_params['counts']),env_params['counts'],
-                env_params['amounts'], env_params['epsilons'],env_params['capacity_upper_scale_bound'],
-                seed,G)
+    if multiple_env == False:
+        env = FeeEnv(env_params["mode"],data,env_params['max_capacity'], env_params['fee_base_upper_bound']
+                    , env_params['max_episode_length'], len(env_params['counts']), env_params['counts'],
+                    env_params['amounts'], env_params['epsilons'],env_params['capacity_upper_scale_bound'],
+                    seed,G)
+    else:
+        env = make_vec_env(FeeEnv, n_envs = 4, env_kwargs=dict(mode = env_params["mode"] , data = data, 
+        max_capacity = env_params['max_capacity'], fee_base_upper_bound = env_params['fee_base_upper_bound'],
+        max_episode_length = env_params['max_episode_length'],number_of_transaction_types = len(env_params['counts']),
+        counts = env_params['counts'], amounts = env_params['amounts'], epsilons = env_params['epsilons'],
+        capacity_upper_scale_bound = env_params['capacity_upper_scale_bound'],seed = seed, LN_graph = G))
 
 
     return env
@@ -214,28 +228,28 @@ def get_fee_based_on_strategy(state, strategy, directed_edges, node_index):
         raise NotImplementedError
     return action, rescale
 
-def get_channels_and_capacities_based_on_strategy(strategy,capacity_upper_scale_bound,n_channels,n_nodes, src,graph_nodes, graph):
+def get_channels_and_capacities_based_on_strategy(strategy, capacity_upper_scale_bound, n_channels,
+                                                   n_nodes, src, graph_nodes, graph, time_step):
     if strategy == 'random':
-        action = get_random_channels_and_capacities(capacity_upper_scale_bound,n_channels,n_nodes)
+        action = get_random_channels_and_capacities(capacity_upper_scale_bound, n_channels, n_nodes)
     if strategy == 'top_k_betweenness':
-        action = get_top_k_betweenness(capacity_upper_scale_bound,n_channels,src,graph_nodes,graph)
+        action = get_top_k_betweenness(capacity_upper_scale_bound, n_channels, src, graph_nodes, graph, time_step)
     #TODO: define basline strategy for random choose channels and capacities index.
 
     return action
 
-def get_top_k_betweenness(scale, n_channels, src, graph_nodes, graph,alpha=2):
+def get_top_k_betweenness(scale, n_channels, src, graph_nodes, graph, time_step, alpha=2):
      nodes_by_betweenness = nx.betweenness_centrality(graph)
-     if src in nodes_by_betweenness:
-         del nodes_by_betweenness[src]
      sorted_by_betweenness = dict(sorted(nodes_by_betweenness.items(), key=lambda item: item[1]))
-     top_k_betweenness = list(sorted_by_betweenness.keys())[:n_channels]
+     top_k_betweenness = list(sorted_by_betweenness.keys())[-n_channels:]
+
      top_k_betweenness = [graph_nodes.index(item) for item in top_k_betweenness if item in graph_nodes]
     #  top_k_capacity = list(sorted_by_betweenness.values())[-n_channels:]
     #  top_k_capacity = [round(scale*(elem+alpha*max(top_k_capacity))/(sum(top_k_capacity)+n_channels*alpha*max(top_k_capacity))) for elem in top_k_capacity]
-
+     scale = 5
      top_k_capacity  = [scale] * n_channels
      
-     return top_k_betweenness + top_k_capacity
+     return [top_k_betweenness[time_step]] + [top_k_capacity[time_step]]
      
 def get_random_channels_and_capacities(capacity_upper_scale_bound,n_channels,n_nodes):
     if n_nodes < n_channels:
