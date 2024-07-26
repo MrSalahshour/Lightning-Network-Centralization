@@ -61,7 +61,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_channels', type=int, default=5)
     parser.add_argument('--mode', type=str, default='channel_openning')#TODO: add this arg to all scripts
     parser.add_argument('--capacity_upper_scale_bound', type=int, default=10)
-    parser.add_argument('--local_heads_number', type=int, default=5)
+    parser.add_argument('--local_heads_number', type=int, default=4)
 
 
 
@@ -94,8 +94,8 @@ if __name__ == '__main__':
         seed = np.random.randint(low=0, high=1000000)
         # data = load_data(env_params['node_index'], env_params['data_path'], env_params['merchants_path'], env_params['local_size'],
         #                  env_params['manual_balance'], env_params['initial_balances'], env_params['capacities'])
-        data = load_data(env_params['mode'],env_params['node_index'], env_params['data_path'], env_params['merchants_path'], env_params['local_size'],
-                     env_params['manual_balance'], env_params['initial_balances'], env_params['capacities'],env_params['n_channels'],env_params['local_heads_number'],env_params["max_capacity"])
+        data = load_data(env_params['data_path'], env_params['merchants_path'], env_params['local_size'],
+                     env_params['n_channels'],env_params['local_heads_number'],env_params["max_capacity"])
         env = make_env(data, env_params, seed, multiple_env = False)
         for i in range(100):
             discounted_reward = evaluate(env_params['mode'],strategy, env, env_params, gamma=1)

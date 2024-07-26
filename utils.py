@@ -43,7 +43,7 @@ def make_agent(env, algo, device, tb_log_dir):
         # Instantiate the PPO agent with the custom policy
         # model = PPO(policy, env, device=device, tensorboard_log=tb_log_dir,rollout_buffer_class
         # = MyCustomDictRolloutBuffer, policy_kwargs=policy_kwargs, verbose=1)
-        model = PPO(policy, env, verbose=1, device=device, tensorboard_log=tb_log_dir, n_steps=5, batch_size=20, gamma=1, policy_kwargs=policy_kwargs)
+        model = PPO(policy, env, verbose=1, device=device, tensorboard_log=tb_log_dir, n_steps=3, batch_size=12, gamma=1)
     elif algo == "TRPO":
         from sb3_contrib import TRPO
         model = TRPO(policy, env, verbose=1, device=device, tensorboard_log=tb_log_dir)
@@ -77,17 +77,16 @@ def make_env(data, env_params, seed, multiple_env):
         env_params['epsilons']), "number of transaction types missmatch"
     
     directed_edges = preprocessing.get_directed_edges(env_params['data_path'])
+
     providers = data['providers']
 
-    G = preprocessing.make_LN_graph(directed_edges, providers, env_params['manual_balance'], data["src"]
-    , data["trgs"], data["channel_ids"], data['fee_policy'], env_params['capacities'], env_params['initial_balances'])
+    G = preprocessing.make_LN_graph(directed_edges, providers)
 
    
     if multiple_env == False:
-        env = FeeEnv(env_params["mode"],data,env_params['max_capacity'], env_params['fee_base_upper_bound']
-                    , env_params['max_episode_length'], len(env_params['counts']), env_params['counts'],
-                    env_params['amounts'], env_params['epsilons'],env_params['capacity_upper_scale_bound'],
-                    seed,G)
+        env = FeeEnv(data,env_params['max_capacity'], env_params['max_episode_length'], len(env_params['counts']),
+              env_params['counts'],env_params['amounts'], env_params['epsilons'],
+              env_params['capacity_upper_scale_bound'], G, seed)
     else:
         env = make_vec_env(FeeEnv, n_envs = 4, env_kwargs=dict(mode = env_params["mode"] , data = data, 
         max_capacity = env_params['max_capacity'], fee_base_upper_bound = env_params['fee_base_upper_bound'],
@@ -119,69 +118,39 @@ def get_or_create_list_of_sub_nodes(G, src, local_heads_number, providers, local
         
         return train_list
 
-def load_data(mode, node, directed_edges_path, providers_path, local_size, manual_balance, initial_balances, capacities, n_channels,local_heads_number, capacities_upperbound):
+def load_data(directed_edges_path, providers_path, local_size, n_channels, local_heads_number, max_capacity):
     """
-    :return:
-    data = dict{mode: Levin is used for different modes: fee_selection, channel_openning (default: String)
-                src: node chosen for simulation  (default: int)
-                trgs: nodes src is connected to  (default: list)
-                channel_ids: channel ids of src node [NOT USED YET]  (default: list)
-                initial_balances: initial distribution of capacity of each channel  (default: list)
-                capacities: capacity of each channel  (default: list)
-                node_variables: ???  (default: )
-                                nodes of the localized subgraph
-                providers: Merchants of the whole network  (default: ?)
-                active_providers: Merchants of the local network around src  (default: ?)
-                active_channels: channel which their balances are being updated each timestep  (default: ?)
-                                In other words channels connected to our node
-                network_dictionary: whole network data  (default: dict)
-                n_channels: number of channels within data (default:int)
-            }
+    Loads and preprocesses the network data required for the Lightning Network environment.
+    
+    Args:
+        directed_edges_path (str): Path to the file containing the directed edges of the Lightning Network.
+        providers_path (str): Path to the file containing the provider information.
+        local_size (int): The size of the local subgraph.
+        n_channels (int): The number of channels in the Lightning Network.
+        local_heads_number (int): The number of local heads in the subgraph.
+        max_capacity (float): The maximum capacity of the channels in the Lightning Network.
+    
+    Returns:
+        dict: A dictionary containing the preprocessed network data, including the source node, fee policy, and maximum values for capacity, fee base, and fee rate.
     """
+        
     print('==================Loading Network Data==================')
+    
     data = {}
     
-    # for fee selection mode
-    # src_index = node
-    
-    #TODO #6: check if the src is actually new 
     src = generate_hex_string(66)
-    
-    # subgraph_radius = 2
-    data['providers'] = preprocessing.get_providers(providers_path)
+    data['src'] = src
+
+    data['local_size'] = local_size
+    data['local_heads_number'] = local_heads_number
     data['n_channels'] = n_channels
     
     directed_edges = preprocessing.get_directed_edges(directed_edges_path)
-    
-    
-    # for fee selection mode
-    # data['src'], data['trgs'], data['channel_ids'], n_channels = preprocessing.select_node(directed_edges, src_index)
-    # data['capacities'] = [153243, 8500000, 4101029, 5900000, 2500000, 7000000]
-    # data['initial_balances'] = [153243 / 2, 8500000 / 2, 4101029 / 2, 5900000 / 2, 2500000 / 2, 7000000 / 2]
-    
-    data['src'], data['trgs'], data['channel_ids'] = preprocessing.create_node(directed_edges, src, n_channels)
-    
-    #NOTE: this part is for fee selection mode
-    # channels = []
-    # for trg in data['trgs']:
-    #     channels.append((data['src'], trg))
-    data['fee_policy'] = preprocessing.create_fee_policy_dict(directed_edges,src)
-    # data['active_channels'], \
-    # data['network_dictionary'], \
-    # data['node_variables'], \
-    # data['active_providers'], \
-    # data['initial_balances'], \
-    # data['capacities'], \
-    # data['fee_policy'],\
-    # data['nodes']= preprocessing.get_init_parameters(data['providers'],
-    #                                                        directed_edges,
-    #                                                        data['src'], data['trgs'],
-    #                                                        data['channel_ids'],
-    #                                                        channels,
-    #                                                        local_size,
-    #                                                        manual_balance, initial_balances, capacities,mode,local_heads_number)
-    
-    data["capacity_max"] = max(directed_edges["capacity"].max(), capacities_upperbound)
+    data['providers'] = preprocessing.get_providers(providers_path)
+    data['fee_policy'] = preprocessing.create_fee_policy_dict(directed_edges, src)
+
+    data["capacity_max"] = max(directed_edges["capacity"].max(), max_capacity)
+
     data["fee_base_max"] = directed_edges["fee_base_msat"].max()
     data["fee_rate_max"] = directed_edges["fee_rate_milli_msat"].max()
     return data

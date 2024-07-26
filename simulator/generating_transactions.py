@@ -15,6 +15,8 @@ def sample_providers(src, K, node_variables, active_providers, exclude_src=True)
 
       probas = list(provider_records["degree"] / provider_records["degree"].sum())
       np.random.seed()
+      if len(nodes)==0:
+         return []
       return np.random.choice(nodes, size=K, replace=True, p=probas)
 
 def generate_transactions(src, amount_in_satoshi, K, node_variables, epsilon, active_providers, verbose=False, exclude_src=True):
@@ -30,9 +32,12 @@ def generate_transactions(src, amount_in_satoshi, K, node_variables, epsilon, ac
       if epsilon > 0:
           n_prov = int(epsilon*K)
           trg_providers = sample_providers(src, n_prov,node_variables,active_providers, exclude_src=True)
-          trg_rnd = np.random.choice(nodes, size=K-n_prov, replace=True)
-          trg_selected = np.concatenate((trg_providers,trg_rnd))
-          np.random.shuffle(trg_selected)
+          if len(trg_providers) == 0:
+              trg_selected = np.random.choice(nodes, size=K, replace=True)
+          else:
+              trg_rnd = np.random.choice(nodes, size=K-n_prov, replace=True)
+              trg_selected = np.concatenate((trg_providers,trg_rnd))
+              np.random.shuffle(trg_selected)
       else:
           trg_selected = np.random.choice(nodes, size=K, replace=True)
 
