@@ -10,9 +10,8 @@ from . import generating_transactions
 #environment has an object of simulator
 class simulator():
   def __init__(self,
-               mode,
-               src,trgs,channel_ids,
-               active_channels, network_dictionary,
+               src,
+               network_dictionary,
                merchants,
                transaction_types, # = [(count, amount, epsilon),...]
                node_variables,
@@ -23,27 +22,26 @@ class simulator():
                graph_nodes = None,
                current_graph = None):
     
-    self.mode = mode
     self.src = src
-    self.trgs = trgs
-    self.channel_id = channel_ids
     self.transaction_types = transaction_types
-    self.number_of_transaction_types = len(transaction_types)
     self.merchants = merchants #list of merchants
     self.node_variables = node_variables
     self.active_providers = active_providers
-    self.active_channels = active_channels
     self.fee_policy = fee_policy
     self.network_dictionary = network_dictionary
     self.fixed_transactions = fixed_transactions
     self.support_onchain_rebalancing = support_onchain_rebalancing
     self.graph_nodes = graph_nodes
     self.current_graph = current_graph
+
+    self.number_of_transaction_types = len(transaction_types)
+    self.graphs_dict = self.generate_graphs_dict(transaction_types)
+
     self.shares = [] 
-    self.transaction_amounts = np.zeros(len(self.graph_nodes))
+    self.trgs = []
+    self.nodes_cumulative_trs_amounts = np.zeros(len(self.graph_nodes))
     self.map_nodes_to_id = dict(zip(self.graph_nodes, np.arange(len(self.graph_nodes))))
 
-    self.graphs_dict = self.generate_graphs_dict(transaction_types)
 
     if fixed_transactions : 
       self.transactions_dict = self.generate_transactions_dict(src, transaction_types, node_variables, active_providers)
@@ -279,7 +277,7 @@ class simulator():
         # self.update_active_channels(src, trg, transaction_amount)
         self.update_graphs(src, trg, transaction_amount)
         if src != self.src:
-          self.transaction_amounts[self.map_nodes_to_id[src]] += transaction_amount
+          self.nodes_cumulative_trs_amounts[self.map_nodes_to_id[src]] += transaction_amount
       
   def is_active_channel(self, src, trg):
     return ((src,trg) in self.active_channels)

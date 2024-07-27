@@ -5,7 +5,6 @@ import numpy as np
 import random
 import math
 from operator import itemgetter
-from littleballoffur import ForestFireSampler
 from collections import deque
 
 def aggregate_edges(directed_edges):
@@ -22,174 +21,43 @@ def aggregate_edges(directed_edges):
     }).reset_index()
     return directed_aggr_edges
 
-    
-def get_neighbors(G, src, local_size):
-    """localising the network around the node"""
 
-    neighbors = [src]
-
-    for i in range(10):
-        outer_list = []
-        for neighbor in neighbors:
-            inner_list = list(G.neighbors(neighbor))
-
-            for v in inner_list:
-
-               if len(neighbors) > local_size:
-                  print('size of sub network: ', len(neighbors))
-                  return set(neighbors)
-               if v not in neighbor:
-                  neighbors.append(v)
-
-def bfs_k_levels(G, src, k):
-    """Localize the network around the node up to k levels using BFS"""
-
-    # Initialize a set to store the nodes visited
-    neighbors = set([src])
-
-    # Initialize a queue for BFS
-    queue = [(src, 0)]
-
-    while queue:
-        node, level = queue.pop(0)
-
-        if level == k:
-            break
-
-        for neighbor in G.neighbors(node):
-            if neighbor not in neighbors:
-                neighbors.add(neighbor)
-                queue.append((neighbor, level + 1))
-
-    print('Number of nodes in k-level BFS: ', len(neighbors))
-    return neighbors
-
-
-def snowball_sampling(G, initial_vertices, stages, k, local_size):
+def fireforest_sample(G, sample_size, providers, local_heads_number, p=0.3):
     """
-    Perform snowball sampling on a graph G.
-
-    Parameters:
-        G (networkx.Graph): The graph to sample from.
-        initial_vertices (list): Initial set of vertices V(0).
-        stages (int): Number of stages for the sampling process.
-        k (int): Number of neighboring nodes to query at each stage.
-
+    Performs a fire forest sampling algorithm to select a sample of nodes from the given graph `G`.
+    
+    Args:
+        G (networkx.Graph): The input graph to sample from.
+        sample_size (int): The desired size of the sample.
+        providers (list): A list of provider nodes to start the sampling from.
+        local_heads_number (int): The number of local heads to select from the providers.
+        p (float, optional): The probability of burning a neighbor node during the sampling process. Defaults to 0.7.
+    
     Returns:
-        set: Set of sampled vertices.
+        list: A list of sampled nodes.
     """
-    random.seed()
-
-    # print(f"initial_vertices: {initial_vertices}")
-    Union_set = set(initial_vertices)
-    sampled_vertices = set(initial_vertices)
-    
-    for i in range(1, stages + 1):
-        new_vertices = set()
-
-        if len(Union_set)>= local_size:
-            break
-        for vertex in sampled_vertices:
-            neighbors = get_snowball_neighbors(G, vertex, k)
-            new_vertices.update(neighbors)
         
-        sampled_vertices = new_vertices.difference(Union_set)
-        if len(Union_set) + len(sampled_vertices)>local_size:
-            Union_set.update(set(random.sample(list(sampled_vertices), local_size - len(Union_set))))
-            break
-        Union_set.update(new_vertices)
+    sampled_nodes = set()
+    while len(sampled_nodes) < sample_size:
 
-    return Union_set
+        burning_nodes = get_random_provider(providers, local_heads_number)
+    
+        while burning_nodes and len(sampled_nodes) < sample_size:
+            current_node = burning_nodes.pop(0)
+            if current_node not in sampled_nodes:
+                sampled_nodes.add(current_node)
+                # Burn neighbors with probability p
+                neighbors = list(G.neighbors(current_node))
+                random.shuffle(neighbors)
+                for neighbor in neighbors:
+                    if neighbor not in sampled_nodes and random.random() < p:
+                        burning_nodes.append(neighbor)
 
-def get_snowball_neighbors(G, vertex, k):
-    
-    """localising the network around the node"""
-    random.seed()
-    
-    neighbors = list(G.neighbors(vertex))
-    sampled_neighbors = random.sample(neighbors, min(k, len(neighbors)))
-    
-    return set(sampled_neighbors)
+        #check connectivity and size        
+        if len(sampled_nodes) < sample_size and not is_subgraph_connected(G, sampled_nodes):
+            sampled_nodes = set()
 
-
-def get_fire_forest_sample(G, reverse_mapping, sample_size, burning_prob=0.7):
-    # Step 1: Convert the directed graph to an undirected graph
-    
-    
-    # # Adding edges and attributes to the undirected graph, avoiding duplicates
-    # for u, v, data in G.edges(data=True):
-    #     if not undirected_G.has_edge(u, v):
-    #         undirected_G.add_edge(u, v, **data)
-    
-    # # Adding node attributes
-    # for node, data in G.nodes(data=True):
-    #     undirected_G.nodes[node].update(data)
-    
-
-    
-
-    
-    # Step 2: Apply the ForestFireSampler to the undirected graph
-    random.seed(10)
-    forestFireSampler = ForestFireSampler(number_of_nodes=sample_size, p=burning_prob,
-                                           max_visited_nodes_backlog=100, restart_hop_size=10)
-    
-    # Wrapper around the sample method
-    def wrapped_sample(graph):
-        def modified_start_a_fire(graph):
-            remaining_nodes = list(forestFireSampler._set_of_nodes.difference(forestFireSampler._sampled_nodes))
-            seed_node = random.choice(remaining_nodes)
-            forestFireSampler._sampled_nodes.add(seed_node)
-            node_queue = deque([seed_node])
-            while len(forestFireSampler._sampled_nodes) < forestFireSampler.number_of_nodes:
-                if len(node_queue) == 0:
-                    node_queue = deque(
-                        [
-                            forestFireSampler._visited_nodes.popleft()
-                            for k in range(
-                                min(forestFireSampler.restart_hop_size, len(forestFireSampler._visited_nodes))
-                            )
-                        ]
-                    )
-                    if len(node_queue) == 0:
-                        print(
-                            "Warning: could not collect the required number of nodes. The fire could not find enough nodes to burn."
-                        )
-                        break
-                top_node = node_queue.popleft()
-                forestFireSampler._sampled_nodes.add(top_node)
-                neighbors = set(forestFireSampler.backend.get_neighbors(graph, top_node))
-                unvisited_neighbors = neighbors.difference(forestFireSampler._sampled_nodes)
-                score = np.random.geometric(forestFireSampler.p)
-                count = min(len(unvisited_neighbors), score)
-                burned_neighbors = random.sample(list(unvisited_neighbors), count)  # Convert to list here
-                forestFireSampler._visited_nodes.extendleft(
-                    unvisited_neighbors.difference(set(burned_neighbors))
-                )
-                for neighbor in burned_neighbors:
-                    if len(forestFireSampler._sampled_nodes) >= forestFireSampler.number_of_nodes:
-                        break
-                    node_queue.extend([neighbor])
-        
-        # Override the _start_a_fire method
-        forestFireSampler._start_a_fire = modified_start_a_fire
-        while True:
-            sampled_nodes = forestFireSampler.sample(graph)
-            if len(sampled_nodes) >= sample_size:
-                return sampled_nodes
-            else:
-                print("Resampling due to insufficient sample size.")
-                random.seed(17)
-    
-    sampled_numeric_undirected_G = wrapped_sample(G)
-    # Map back to original node labels
-    
-    sampled_undirected_G = nx.relabel_nodes(sampled_numeric_undirected_G, reverse_mapping)
-    sub_nodes = list(sampled_undirected_G.nodes())
-    return sub_nodes
-    
-
-    
+    return list(sampled_nodes)
 
 def initiate_balances(directed_edges, approach='half'):
     '''
@@ -236,30 +104,26 @@ def set_channels_balances(edges, src, trgs, channel_ids, capacities, initial_bal
 
 
 def create_network_dictionary(G):
+    """
+    Creates a dictionary that maps each channel (represented as a tuple of source and target nodes) to a list containing the channel's balance, fee rate, fee base, and capacity.
+    
+    Args:
+        G (pandas.DataFrame): A DataFrame containing the network's edges, with columns for 'src', 'trg', 'balance', 'fee_rate_milli_msat', 'fee_base_msat', and 'capacity'.
+    
+    Returns:
+        dict: A dictionary mapping each channel to a list of its properties.
+    """
     keys = list(zip(G["src"], G["trg"]))
-    vals = [list(item) for item in zip([None] * len(G), G["fee_rate_milli_msat"], G['fee_base_msat'], G["capacity"])]
-
+    vals = [list(item) for item in zip(G["balance"], G["fee_rate_milli_msat"], G['fee_base_msat'], G["capacity"])]
     network_dictionary = dict(zip(keys, vals))
-    for index, row in G.iterrows():
-        src = row['src']
-        trg = row['trg']
-        network_dictionary[(src, trg)][0] = row['balance']
-
     return network_dictionary
 
 
-def create_active_channels(network_dictionary, channels):
-    # channels = [(src1,trg1),(src2,trg2),...]
-    active_channels = dict()
-    for (src, trg) in channels:
-        active_channels[(src, trg)] = network_dictionary[(src, trg)]
-        active_channels[(trg, src)] = network_dictionary[(trg, src)]
-    return active_channels
 
-def make_LN_graph(directed_edges, providers, manual_balance, src, trgs, channel_ids, fee_policy_dict, capacities, initial_balances,):
+
+def make_LN_graph(directed_edges, providers):
     edges = initiate_balances(directed_edges)
-    if manual_balance:
-        edges = set_channels_balances(edges, src, trgs, channel_ids, capacities, initial_balances)
+    
     G = nx.from_pandas_edgelist(edges, source="src", target="trg",
                                 edge_attr=['channel_id', 'capacity', 'fee_base_msat', 'fee_rate_milli_msat', 'balance'],
                                create_using=nx.DiGraph())
@@ -270,29 +134,13 @@ def make_LN_graph(directed_edges, providers, manual_balance, src, trgs, channel_
     providers_nodes = list(set(providers))
     
     for node in G.nodes():
-        G.nodes[node]["feature"] = np.array([0, node in providers_nodes, 0,  0, 0, 0])
+        G.nodes[node]["feature"] = np.array([0, node in providers_nodes, 0])
     return G
 
-def get_nodes_centralities(G):
+def get_nodes_degree_centrality(G):
     degrees = nx.degree_centrality(G)
-    # eigenvectors = get_eigenvector_centrality(G, degrees)
-    eigenvectors = 0
-    return degrees, eigenvectors
+    return degrees
 
-def get_eigenvector_centrality(G, degree_centrality):
-    try:
-        # Try calculating eigenvector centrality with default parameters
-        eigenvectors = nx.eigenvector_centrality(G)
-        return eigenvectors
-    except nx.PowerIterationFailedConvergence as e:
-        print(f"Eigenvector centrality failed to converge: {e}. Trying with increased iterations and adjusted tolerance.")
-        try:
-            # Try calculating eigenvector centrality with increased iterations and adjusted tolerance
-            eigenvectors = nx.eigenvector_centrality(G, max_iter=1000, tol=1e-06)
-            return eigenvectors
-        except nx.PowerIterationFailedConvergence as e:
-            print(f"Eigenvector centrality still failed to converge: {e}. Using degree centrality as a fallback.")
-            return degree_centrality
     
 
 def create_sub_network(directed_edges, providers, src, trgs, channel_ids, local_size, local_heads_number, manual_balance=False, initial_balances = [], capacities=[]):
@@ -315,17 +163,34 @@ def create_sub_network(directed_edges, providers, src, trgs, channel_ids, local_
 
     return network_dictionary, sub_nodes, sub_providers, sub_edges
 
-def get_sub_graph_properties(G,sub_nodes,providers):
+def get_sub_graph_properties(G, sub_nodes, providers):
+    """
+    Extracts the properties of a subgraph from the given graph `G` and the set of subgraph nodes `sub_nodes`.
+    
+    Args:
+        G (networkx.Graph): The full graph.
+        sub_nodes (set): The set of nodes in the subgraph.
+        providers (list): The list of provider nodes.
+    
+    Returns:
+        tuple:
+            - network_dictionary (dict): A dictionary mapping node pairs to a list of edge attributes.
+            - sub_providers (list): The list of provider nodes in the subgraph.
+            - sub_edges (pandas.DataFrame): The DataFrame of edges in the subgraph.
+            - sub_graph (networkx.Graph): The subgraph.
+    """
+        
     
     sub_providers = list(set(sub_nodes) & set(providers))
     sub_graph = G.subgraph(sub_nodes).copy()
-    degrees, _ = get_nodes_centralities(G)
+    degrees = get_nodes_degree_centrality(G)
+
     #set centrality of nodes
     for node in G.nodes():
         G.nodes[node]["feature"][0] = degrees[node]
         
     sub_edges = nx.to_pandas_edgelist(sub_graph)
-    sub_edges = sub_edges.rename(columns={'source': 'src', 'target': 'trg'})    
+    sub_edges = sub_edges.rename(columns={'source': 'src', 'target': 'trg'})  
     network_dictionary = create_network_dictionary(sub_edges)
 
     return network_dictionary, sub_providers, sub_edges, sub_graph
@@ -390,7 +255,9 @@ def components(G, nodes):
 
 
 def init_node_params(edges, providers, verbose=False):
+
     """Initialize source and target distribution of each node in order to draw transaction at random later."""
+    
     G = nx.from_pandas_edgelist(edges, source="src", target="trg", edge_attr=["capacity"], create_using=nx.DiGraph())
     active_providers = list(set(providers).intersection(set(G.nodes())))
     if len(providers) == 0:
@@ -407,7 +274,15 @@ def init_node_params(edges, providers, verbose=False):
 
 
 def get_providers(providers_path):
-    # The path should direct this to a json file containing providers
+    """
+    Retrieves a list of provider public keys from a JSON file.
+    
+    Args:
+        providers_path (str): The file path to the JSON file containing the provider public keys.
+    
+    Returns:
+        list: A list of provider public keys.
+    """
     with open(providers_path) as f:
         tmp_json = json.load(f)
     providers = []
@@ -417,6 +292,15 @@ def get_providers(providers_path):
 
 
 def get_directed_edges(directed_edges_path):
+    """
+    Retrieves a DataFrame of directed edges from a JSON file.
+    
+    Args:
+        directed_edges_path (str): The file path to the JSON file containing the directed edges.
+    
+    Returns:
+        pandas.DataFrame: A DataFrame containing the directed edges, with columns 'src', 'trg', and 'channel_id'.
+    """
     directed_edges = pd.read_json(directed_edges_path)
     directed_edges = aggregate_edges(directed_edges)
     return directed_edges
@@ -429,12 +313,6 @@ def select_node(directed_edges, src_index):
     number_of_channels = len(trgs)
     return src, list(trgs), list(channel_ids), number_of_channels
 
-#NOTE: creates the node for channel openning mode
-def create_node(directed_edges, src, number_of_channels):
-    trgs = []
-    max_id = max(directed_edges['channel_id'])
-    channel_ids = [(max_id + i + 1) for i in range (number_of_channels*2)]
-    return src, list(trgs), list(channel_ids)
     
 
 #NOTE: the followings are to check the similarity of graphs
@@ -470,21 +348,27 @@ def get_init_parameters(providers, directed_edges, src, trgs, channel_ids, chann
     return active_channels, network_dictionary, node_variables, active_providers, balances, capacities, fee_policy_dict, nodes
 
 def create_fee_policy_dict(directed_edges, src):
-    #get fee_base and fee_rate median for each node
+    """
+    Creates a dictionary that maps each source node to a tuple of the median fee base and fee rate for that node's outgoing channels.
+    
+    Args:
+        directed_edges (pandas.DataFrame): A DataFrame containing the directed edges, with columns 'src', 'trg', 'fee_base_msat', and 'fee_rate_milli_msat'.
+        src (str): The source node for which to create the fee policy dictionary.
+    
+    Returns:
+        dict: A dictionary that maps each source node to a tuple of the median fee base and fee rate for that node's outgoing channels.
+    """
     fee_policy_dict = dict()
     
     median_base = directed_edges["fee_base_msat"].median()
     median_rate = directed_edges["fee_rate_milli_msat"].median()
-    
     grouped = directed_edges.groupby(["src"])
     temp = grouped.agg({
         "fee_base_msat": "median",
         "fee_rate_milli_msat": "median",
-    }).reset_index()[["src","fee_base_msat","fee_rate_milli_msat"]]
-    
+    }).reset_index()
     for i in range(len(temp)):
         fee_policy_dict[temp["src"][i]] = (temp["fee_base_msat"][i], temp["fee_rate_milli_msat"][i])
-        
     fee_policy_dict[src] = (median_base, median_rate)
     return fee_policy_dict
 
@@ -567,33 +451,10 @@ def top_k_nodes_betweenness(G, k):
     # Return only the nodes, not their betweenness centrality
     return [node for node, centrality in top_k]
 
-def is_subgraph_weakly_connected(G, nodes):
-    """
-    Check if the subgraph induced by 'nodes' in directed graph 'G' is weakly connected.
 
-    Parameters:
-    G (networkx.DiGraph): The main directed graph.
-    nodes (list): The nodes of the subgraph.
-
-    Returns:
-    bool: True if the subgraph is weakly connected, False otherwise.
-    """
+def is_subgraph_connected(G, nodes):
     H = G.subgraph(nodes)
-    return nx.is_weakly_connected(H)
-
-def is_subgraph_strongly_connected(G, nodes):
-    """
-    Check if the subgraph induced by 'nodes' in directed graph 'G' is strongly connected.
-
-    Parameters:
-    G (networkx.DiGraph): The main directed graph.
-    nodes (list): The nodes of the subgraph.
-
-    Returns:
-    bool: True if the subgraph is strongly connected, False otherwise.
-    """
-    H = G.subgraph(nodes)
-    return nx.is_strongly_connected(H)
+    return nx.is_connected(H)
 
 
 
