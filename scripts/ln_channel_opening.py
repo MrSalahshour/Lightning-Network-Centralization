@@ -67,7 +67,7 @@ def main():
     parser.add_argument('--tb_name', required=True)
     parser.add_argument('--log_dir', default='plotting/tb_results/trained_model/')
     parser.add_argument('--n_seed', type=int, default=1) # 5
-    parser.add_argument('--total_timesteps', type=int, default=200000)
+    parser.add_argument('--total_timesteps', type=int, default=300000)
     parser.add_argument('--max_episode_length', type=int, default=3)
     parser.add_argument('--local_size', type=int, default=10)
     parser.add_argument('--counts', default=[200, 200, 200], type=lambda s: [int(item) for item in s.split(',')])
@@ -77,7 +77,7 @@ def main():
     parser.add_argument('--max_capacity', type = int, default=1e7) #SAT
     parser.add_argument('--n_channels', type=int, default=3)
     parser.add_argument('--mode', type=str, default='channel_openning')#TODO: add this arg to all scripts
-    parser.add_argument('--capacity_upper_scale_bound', type=int, default=5)
+    parser.add_argument('--capacity_upper_scale_bound', type=int, default=10)
     parser.add_argument('--local_heads_number', type=int, default=5)
     parser.add_argument('--sampling_k', type=int, default=4)
     parser.add_argument('--sampling_stages', type=int, default=4)

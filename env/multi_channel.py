@@ -92,7 +92,7 @@ class FeeEnv(gym.Env):
 
         
         #Action Space
-        self.action_space = spaces.Discrete(self.n_nodes)
+        self.action_space = spaces.MultiDiscrete([self.n_nodes, self.capacity_upper_scale_bound - 1])
 
         self.num_node_features = len(next(iter(self.simulator.current_graph.nodes(data=True)))[1]['feature'])
         
@@ -146,14 +146,14 @@ class FeeEnv(gym.Env):
 
         
         
-        new_trg = self.graph_nodes[action]
+        new_trg = self.graph_nodes[action[0]]
         if new_trg not in self.simulator.trgs:
             self.simulator.trgs.append(new_trg)
             # self.simulator.shares.append(action[1])
-            self.simulator.shares[new_trg] = self.max_capacity/self.max_episode_length
+            self.simulator.shares[new_trg] = action[1] + 1
         else:
             budget_so_far = self.simulator.shares[new_trg]
-            self.simulator.shares[new_trg] = budget_so_far + self.max_capacity/self.max_episode_length
+            self.simulator.shares[new_trg] = budget_so_far + action[1] + 1
 
 
 
@@ -244,7 +244,6 @@ class FeeEnv(gym.Env):
         self.time_step = 0
         self.prev_action = []
         self.prev_reward = 0
-        self.simulator.shares = []
         self.set_new_graph_environment()
 
         # self.remaining_capacity = self.max_capacity
@@ -304,7 +303,12 @@ class FeeEnv(gym.Env):
 
         # fixed_trgs = self.simulator.trgs
         # fixed_action = list((np.array(self.simulator.shares)/self.max_episode_length) * self.max_capacity)
-        trgs_and_caps = list(self.simulator.shares.keys()) + list(self.simulator.shares.values())
+        shares_list = list(self.simulator.shares.values())
+        trgs_list = list(self.simulator.shares.keys())
+        shares_sum = sum(shares_list) 
+        caps = [item / shares_sum * self.max_capacity for item in shares_list]
+        trgs_and_caps = trgs_list + caps
+        
 
         # if len(action) != 0:
         #     fixed_action = list(softmax(np.array(action[midpoint:])) * self.maximum_capacity)    
@@ -523,8 +527,7 @@ class FeeEnv(gym.Env):
             node_features[self.simulator.map_nodes_to_id[node[0]]][2] = normalized_transaction_amounts[self.simulator.map_nodes_to_id[node[0]]]
             node_features[self.simulator.map_nodes_to_id[node[0]]][3] = 0
             if node[0] in self.simulator.trgs:
-                node_features[self.simulator.map_nodes_to_id[node[0]]][3] = self.simulator.shares[node[0]]/self.max_capacity
-
+                node_features[self.simulator.map_nodes_to_id[node[0]]][3] = self.simulator.shares[node[0]]/sum(self.simulator.shares.values())
         
 
 
