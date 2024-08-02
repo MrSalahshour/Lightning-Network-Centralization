@@ -34,11 +34,11 @@ class simulator():
     self.graph_nodes = graph_nodes
     self.current_graph = current_graph
 
-    self.scr_fee_base, self.src_fee_rate = fee_policy[src]
+    self.src_fee_base, self.src_fee_rate = fee_policy[src]
     self.number_of_transaction_types = len(transaction_types)
     self.graphs_dict = self.generate_graphs_dict(transaction_types)
 
-    self.shares = [] 
+    self.shares = {}
     self.trgs = []
     self.nodes_cumulative_trs_amounts = np.zeros(len(self.graph_nodes))
     self.map_nodes_to_id = dict(zip(self.graph_nodes, np.arange(len(self.graph_nodes))))
@@ -408,7 +408,7 @@ class simulator():
       for amount, graph in self.graphs_dict.items():
         if bal >= amount:
           graph.add_edge(trg, self.src, weight = base_fees[i] * 1000 + fee_rates[i] * amount) # to turn fee base to mili msat multiply to 1000
-          graph.add_edge(self.src, trg, weight = self.scr_fee_base * 1000 + self.src_fee_rate * amount) # to turn fee base to mili msat multiply to 1000
+          graph.add_edge(self.src, trg, weight = self.src_fee_base * 1000 + self.src_fee_rate * amount) # to turn fee base to mili msat multiply to 1000
           self.graphs_dict[amount] = graph
 
   def update_evolved_graph(self, fees, list_of_pairs):

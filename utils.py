@@ -36,14 +36,19 @@ def make_agent(env, algo, device, tb_log_dir):
         #     features_extractor_class=CustomGATv2Extractor,
         #     features_extractor_kwargs=dict(features_dim=64),
         # )
-        policy_kwargs = dict(
-            features_extractor_class=CustomTransformer,
-            features_extractor_kwargs=dict(features_dim=128, embed_dim=128, nhead=4, num_layers=3),
-        )
+        # policy_kwargs = dict(
+        #     features_extractor_class=CustomTransformer,
+        #     features_extractor_kwargs=dict(features_dim=128, embed_dim=128, nhead=4, num_layers=3),
+        # )
+        policy_kwargs = dict(net_arch=dict(pi=[64, 64, 64, 64], qf=[64, 64, 64, 64]))
+
         # Instantiate the PPO agent with the custom policy
         # model = PPO(policy, env, device=device, tensorboard_log=tb_log_dir,rollout_buffer_class
         # = MyCustomDictRolloutBuffer, policy_kwargs=policy_kwargs, verbose=1)
-        model = PPO(policy, env, verbose=1, device=device, tensorboard_log=tb_log_dir, n_steps=3, batch_size=12, gamma=1)
+        # model = PPO(policy, env, verbose=1, device=device, tensorboard_log=tb_log_dir, n_steps=3, batch_size=12, gamma=1)
+        model = PPO(policy, env, verbose=1, device=device, policy_kwargs=policy_kwargs, tensorboard_log=tb_log_dir, n_steps=10, batch_size=40, gamma=1)
+        # model = PPO(policy, env, verbose=1, device=device, tensorboard_log=tb_log_dir, gamma=1)
+
     elif algo == "TRPO":
         from sb3_contrib import TRPO
         model = TRPO(policy, env, verbose=1, device=device, tensorboard_log=tb_log_dir)
@@ -84,15 +89,14 @@ def make_env(data, env_params, seed, multiple_env):
 
    
     if multiple_env == False:
-        env = FeeEnv(data,env_params['max_capacity'], env_params['max_episode_length'], len(env_params['counts']),
+        env = FeeEnv(data, env_params['max_capacity'], env_params['max_episode_length'], len(env_params['counts']),
               env_params['counts'],env_params['amounts'], env_params['epsilons'],
               env_params['capacity_upper_scale_bound'], G, seed)
     else:
-        env = make_vec_env(FeeEnv, n_envs = 4, env_kwargs=dict(mode = env_params["mode"] , data = data, 
-        max_capacity = env_params['max_capacity'], fee_base_upper_bound = env_params['fee_base_upper_bound'],
+        env = make_vec_env(FeeEnv, n_envs = 4, env_kwargs=dict(data = data, max_capacity = env_params['max_capacity'],
         max_episode_length = env_params['max_episode_length'],number_of_transaction_types = len(env_params['counts']),
         counts = env_params['counts'], amounts = env_params['amounts'], epsilons = env_params['epsilons'],
-        capacity_upper_scale_bound = env_params['capacity_upper_scale_bound'],seed = seed, LN_graph = G))
+        capacity_upper_scale_bound = env_params['capacity_upper_scale_bound'], LN_graph = G, seed = seed))
 
 
     return env
@@ -210,15 +214,19 @@ def get_channels_and_capacities_based_on_strategy(strategy, capacity_upper_scale
 def get_top_k_betweenness(scale, n_channels, src, graph_nodes, graph, time_step, alpha=2):
      nodes_by_betweenness = nx.betweenness_centrality(graph)
      sorted_by_betweenness = dict(sorted(nodes_by_betweenness.items(), key=lambda item: item[1]))
-     top_k_betweenness = list(sorted_by_betweenness.keys())[-n_channels:]
+     top_k_betweenness = list(sorted_by_betweenness.keys())[:n_channels]
 
      top_k_betweenness = [graph_nodes.index(item) for item in top_k_betweenness if item in graph_nodes]
     #  top_k_capacity = list(sorted_by_betweenness.values())[-n_channels:]
     #  top_k_capacity = [round(scale*(elem+alpha*max(top_k_capacity))/(sum(top_k_capacity)+n_channels*alpha*max(top_k_capacity))) for elem in top_k_capacity]
      scale = 5
      top_k_capacity  = [scale] * n_channels
+
+     print("time_step:",time_step)
      
-     return [top_k_betweenness[time_step]] + [top_k_capacity[time_step]]
+    #  return [top_k_betweenness[time_step]] + [top_k_capacity[time_step]]
+     return top_k_betweenness[time_step]
+
      
 def get_random_channels_and_capacities(capacity_upper_scale_bound,n_channels,n_nodes):
     if n_nodes < n_channels:

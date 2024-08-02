@@ -48,17 +48,14 @@ if __name__ == '__main__':
     parser.add_argument('--n_seed', type=int, default=1) # 5
     parser.add_argument('--fee_base_upper_bound', type=int, default=100)
     parser.add_argument('--total_timesteps', type=int, default=100000)
-    parser.add_argument('--max_episode_length', type=int, default=5)
-    parser.add_argument('--local_size', type=int, default=100)
-    parser.add_argument('--counts', default=[20, 20, 20], type=lambda s: [int(item) for item in s.split(',')])
+    parser.add_argument('--max_episode_length', type=int, default=3)
+    parser.add_argument('--local_size', type=int, default=10)
+    parser.add_argument('--counts', default=[200, 200, 200], type=lambda s: [int(item) for item in s.split(',')])
     parser.add_argument('--amounts', default=[10000, 50000, 100000], type=lambda s: [int(item) for item in s.split(',')])
     parser.add_argument('--epsilons', default=[.6, .6, .6], type=lambda s: [float(item) for item in s.split(',')])
-    parser.add_argument('--manual_balance', default=False)
-    parser.add_argument('--initial_balances', default=[], type=lambda s: [int(item) for item in s.split(',')])
-    parser.add_argument('--capacities', default=[],type=lambda s: [int(item) for item in s.split(',')])
     parser.add_argument('--device', default='auto')
     parser.add_argument('--max_capacity', type = int, default=1e7) 
-    parser.add_argument('--n_channels', type=int, default=5)
+    parser.add_argument('--n_channels', type=int, default=3)
     parser.add_argument('--mode', type=str, default='channel_openning')#TODO: add this arg to all scripts
     parser.add_argument('--capacity_upper_scale_bound', type=int, default=10)
     parser.add_argument('--local_heads_number', type=int, default=4)
@@ -78,9 +75,6 @@ if __name__ == '__main__':
                   'counts': args.counts,
                   'amounts': args.amounts,
                   'epsilons': args.epsilons,
-                  'manual_balance': args.manual_balance,
-                  'initial_balances': args.initial_balances,
-                  'capacities': args.capacities,
                   'max_capacity': args.max_capacity,
                   'n_channels': args.n_channels,
                   'capacity_upper_scale_bound': args.capacity_upper_scale_bound,
@@ -95,7 +89,7 @@ if __name__ == '__main__':
         # data = load_data(env_params['node_index'], env_params['data_path'], env_params['merchants_path'], env_params['local_size'],
         #                  env_params['manual_balance'], env_params['initial_balances'], env_params['capacities'])
         data = load_data(env_params['data_path'], env_params['merchants_path'], env_params['local_size'],
-                     env_params['n_channels'],env_params['local_heads_number'],env_params["max_capacity"])
+                    env_params['n_channels'],env_params['local_heads_number'], env_params["max_capacity"])
         env = make_env(data, env_params, seed, multiple_env = False)
         for i in range(100):
             discounted_reward = evaluate(env_params['mode'],strategy, env, env_params, gamma=1)

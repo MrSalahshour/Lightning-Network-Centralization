@@ -65,19 +65,14 @@ def main():
     parser.add_argument('--merchants_path', default='data/merchants.json')
     parser.add_argument('--tb_log_dir', default='plotting/tb_results')
     parser.add_argument('--tb_name', required=True)
-    parser.add_argument('--node_index', type=int, default=76620) #97851
     parser.add_argument('--log_dir', default='plotting/tb_results/trained_model/')
     parser.add_argument('--n_seed', type=int, default=1) # 5
-    parser.add_argument('--fee_base_upper_bound', type=int, default=100)
-    parser.add_argument('--total_timesteps', type=int, default=20000)
+    parser.add_argument('--total_timesteps', type=int, default=200000)
     parser.add_argument('--max_episode_length', type=int, default=3)
-    parser.add_argument('--local_size', type=int, default=100)
-    parser.add_argument('--counts', default=[100, 100, 100], type=lambda s: [int(item) for item in s.split(',')])
+    parser.add_argument('--local_size', type=int, default=10)
+    parser.add_argument('--counts', default=[200, 200, 200], type=lambda s: [int(item) for item in s.split(',')])
     parser.add_argument('--amounts', default=[10000, 50000, 100000], type=lambda s: [int(item) for item in s.split(',')])
     parser.add_argument('--epsilons', default=[.6, .6, .6], type=lambda s: [float(item) for item in s.split(',')])
-    parser.add_argument('--manual_balance', default=False)
-    parser.add_argument('--initial_balances', default=[], type=lambda s: [int(item) for item in s.split(',')])
-    parser.add_argument('--capacities', default=[],type=lambda s: [int(item) for item in s.split(',')])
     parser.add_argument('--device', default='auto')
     parser.add_argument('--max_capacity', type = int, default=1e7) #SAT
     parser.add_argument('--n_channels', type=int, default=3)
@@ -99,16 +94,11 @@ def main():
     env_params = {'mode' : args.mode,
                   'data_path': args.data_path,
                   'merchants_path': args.merchants_path,
-                  'node_index': args.node_index,
-                  'fee_base_upper_bound': args.fee_base_upper_bound,
                   'max_episode_length': args.max_episode_length,
                   'local_size': args.local_size,
                   'counts': args.counts,
                   'amounts': args.amounts,
                   'epsilons': args.epsilons,
-                  'manual_balance': args.manual_balance,
-                  'initial_balances': args.initial_balances,
-                  'capacities': args.capacities,
                   'max_capacity': args.max_capacity,
                   'n_channels': args.n_channels,
                   'capacity_upper_scale_bound': args.capacity_upper_scale_bound,
