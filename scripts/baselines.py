@@ -18,7 +18,7 @@ def evaluate(mode,strategy, env, env_params, gamma):
             state = state*1000
         else:
             #NOTE: Add env_params["scale"], apply to amounts when generating amount graphs
-            if strategy == "top_k_betweenness":
+            if strategy == "top_k_betweenness" or strategy == "bottom_k_betweenness":
                 graph = env.get_local_graph(scale = 230000/(10000/env_params["amounts"][0]))
             else: graph = None
             #NOTE: should define a evaluation functions here to use as balinese evaluation for channel selection fee.
@@ -38,7 +38,7 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser(description='Baselines')
-    parser.add_argument('--strategy', choices=['static', 'proportional', 'match_peer','random','top_k_betweenness'], default='static', required=False)
+    parser.add_argument('--strategy', choices=['random','top_k_betweenness','bottom_k_betweenness'], default='random', required=False)
     parser.add_argument('--data_path', default='data/data.json')
     parser.add_argument('--merchants_path', default='data/merchants.json')
     # parser.add_argument('--tb_log_dir', default='plotting/tb_results')
