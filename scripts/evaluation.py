@@ -11,10 +11,10 @@ def evaluate(model, env, gamma):
     rewards = []
     random.seed()
     while not done:
-        # action, _state = model.predict(state)
-        random.seed()
-        action = random.randint(0,9)
-        # action = [random.randint(0,49)] + [random.randint(0,10)]
+        action, _state = model.predict(state)
+        # random.seed()
+        # action = random.randint(0,9)
+        # action = [random.randint(0,9)] + [random.randint(0,9)]
         # action = np.array(action)
 
         # print("a1",action)
@@ -97,7 +97,7 @@ if __name__ == '__main__':
                     env_params['n_channels'],env_params['local_heads_number'], env_params["max_capacity"])
         for algo in algos:
             env = make_env(data, env_params, seed, multiple_env = False)
-            model = PPO.load("plotting/tb_results/trained_model/PPO_Complex_MLP_fixed_graph_test_10nodes_final_reward",env)
+            model = PPO.load("plotting/tb_results/trained_model/PPO_tensorboard_10_nodes_fixedGraph_3channels_max_cap_selection",env)
             # model = load_model(algo, env_params,"plotting/tb_results/trained_model/PPO_tensorboard_7step_50nodes_fixed_graph_complex_mlp_4_env_with_capacity_new_idea")
             # model.set_env(env)
 

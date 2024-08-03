@@ -207,7 +207,10 @@ def get_channels_and_capacities_based_on_strategy(strategy, capacity_upper_scale
         action = get_random_channels_and_capacities(capacity_upper_scale_bound, n_channels, n_nodes)
     if strategy == 'top_k_betweenness':
         action = get_top_k_betweenness(capacity_upper_scale_bound, n_channels, src, graph_nodes, graph, time_step)
+    if strategy == 'bottom_k_betweenness':
+        action = get_bottom_k_betweenness(capacity_upper_scale_bound, n_channels, src, graph_nodes, graph, time_step)
     #TODO: define basline strategy for random choose channels and capacities index.
+    
 
     return action
 
@@ -224,8 +227,23 @@ def get_top_k_betweenness(scale, n_channels, src, graph_nodes, graph, time_step,
 
      print("time_step:",time_step)
      
-    #  return [top_k_betweenness[time_step]] + [top_k_capacity[time_step]]
-     return top_k_betweenness[time_step]
+     return [top_k_betweenness[time_step]] + [top_k_capacity[time_step]]
+    #  return top_k_betweenness[time_step]
+
+def get_bottom_k_betweenness(scale, n_channels, src, graph_nodes, graph, time_step, alpha=2):
+     nodes_by_betweenness = nx.betweenness_centrality(graph)
+     sorted_by_betweenness = dict(sorted(nodes_by_betweenness.items(), key=lambda item: item[1]))
+     top_k_betweenness = list(sorted_by_betweenness.keys())[-n_channels:]
+
+     top_k_betweenness = [graph_nodes.index(item) for item in top_k_betweenness if item in graph_nodes]
+    #  top_k_capacity = list(sorted_by_betweenness.values())[-n_channels:]
+    #  top_k_capacity = [round(scale*(elem+alpha*max(top_k_capacity))/(sum(top_k_capacity)+n_channels*alpha*max(top_k_capacity))) for elem in top_k_capacity]
+     scale = 5
+     top_k_capacity  = [scale] * n_channels
+
+     print("time_step:",time_step)
+     
+     return [top_k_betweenness[time_step]] + [top_k_capacity[time_step]]
 
      
 def get_random_channels_and_capacities(capacity_upper_scale_bound,n_channels,n_nodes):
