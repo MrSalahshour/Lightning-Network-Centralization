@@ -36,6 +36,7 @@ def fireforest_sample(G, sample_size, providers, local_heads_number, p=0.3):
     Returns:
         list: A list of sampled nodes.
     """
+    random.seed(44)
         
     sampled_nodes = set()
     while len(sampled_nodes) < sample_size:
@@ -56,8 +57,9 @@ def fireforest_sample(G, sample_size, providers, local_heads_number, p=0.3):
         #check connectivity and size        
         if len(sampled_nodes) < sample_size and not is_subgraph_connected(G, sampled_nodes):
             sampled_nodes = set()
+            random.seed(17)
 
-    return list(sampled_nodes)
+    return sorted(list(sampled_nodes))
 
 def initiate_balances(directed_edges, approach='half'):
     '''
@@ -133,8 +135,9 @@ def make_LN_graph(directed_edges, providers):
     # degrees, closeness, eigenvectors = set_node_attributes(G)
     providers_nodes = list(set(providers))
     
+    
     for node in G.nodes():
-        G.nodes[node]["feature"] = np.array([0, node in providers_nodes, 0])
+        G.nodes[node]["feature"] = np.array([0, node in providers_nodes, 0, 0])
     return G
 
 def get_nodes_degree_centrality(G):
@@ -143,25 +146,6 @@ def get_nodes_degree_centrality(G):
 
     
 
-def create_sub_network(directed_edges, providers, src, trgs, channel_ids, local_size, local_heads_number, manual_balance=False, initial_balances = [], capacities=[]):
-    """creating network_dictionary, edges and providers for the local subgraph."""
-    print("............creating network_dictionary.................")
-
-    G = make_LN_graph(directed_edges, manual_balance, src, trgs, channel_ids, capacities, initial_balances)
-
-    if len(trgs)==0:
-        print("No trgs found")
-        #NOTE: in CHANNEL OPENNING case, instead of src, a provider is given for generating the local subgraph
-        sub_nodes = create_sampled_sub_node(G,src,local_heads_number,providers,local_size,sampling_mode = 'degree')
-        
-    else:
-        sub_nodes = get_neighbors(G, src, local_size)
-        
-    network_dictionary, sub_providers, sub_edges, _ = get_sub_graph_properties(G,sub_nodes,providers)
-
-    # network_dictionary = {(src,trg):[balance,alpha,beta,capacity]}
-
-    return network_dictionary, sub_nodes, sub_providers, sub_edges
 
 def get_sub_graph_properties(G, sub_nodes, providers):
     """
@@ -196,57 +180,6 @@ def get_sub_graph_properties(G, sub_nodes, providers):
     return network_dictionary, sub_providers, sub_edges, sub_graph
 
 
-def create_sampled_sub_node(G, src, local_heads_number, providers, local_size, sampling_mode = 'degree'):
-    G.add_node(src)
-    sub_nodes = set()
-
-    #NOTE: The following were replaced with weighted random sampling
-    if sampling_mode == 'degree':
-        random_base_nodes =  random_k_nodes_log_weighted(G, local_heads_number)
-
-    if sampling_mode == 'betweenness':
-        random_base_nodes =  random_k_nodes_betweenness_weighted(G, local_heads_number)
-
-    if sampling_mode == 'provider':
-        random_base_nodes = get_random_provider(providers, local_heads_number)
-    
-    
-    sub_nodes.update(snowball_sampling(G,random_base_nodes,stages=4,k=4, local_size=local_size))
-    
-    if len(sub_nodes) < local_size:
-        raise GraphTooSmallError()
-
-    if not is_subgraph_strongly_connected(G, sub_nodes):
-        raise GraphNotConnectedError()
-    
-    sub_nodes.add(src)
-
-    return sub_nodes
-
-def create_list_of_sub_nodes(G, src, local_heads_number, providers, local_size, list_size = 5000):
-    max_number_of_iteration = 10000
-
-    list_of_sub_nodes = []
-    counter = 0
-    while len(list_of_sub_nodes) < list_size and counter <= max_number_of_iteration :
-        try:
-            sub_node = create_sampled_sub_node(G, src, local_heads_number, providers, local_size, sampling_mode = 'degree')
-            if sub_node not in list_of_sub_nodes:
-                list_of_sub_nodes.append(sub_node)
-                print("Added:-->",len(list_of_sub_nodes))
-            else:
-                print("This Graph has been created before")
-            counter+=1
-        except GraphNotConnectedError as e:
-            print(e.message, " trying again")
-            counter+=1
-            continue
-        except GraphTooSmallError as e:
-            print(e.message, " trying again")
-            counter+=1
-            continue
-
-    return list_of_sub_nodes
 
 
 def components(G, nodes):
@@ -330,22 +263,7 @@ def graph_edit_distance_similarity(graph1, graph2):
     
     return ged,similarity
     
-def get_init_parameters(providers, directed_edges, src, trgs, channel_ids, channels, local_size, manual_balance, initial_balances,capacities,mode, local_heads_number):
-    fee_policy_dict = create_fee_policy_dict(directed_edges)     
-    
-    network_dictionary, nodes, sub_providers, sub_edges = create_sub_network(directed_edges, providers, src, trgs,
-                                                                             channel_ids, local_size, local_heads_number, manual_balance, initial_balances, capacities)
-    active_channels = create_active_channels(network_dictionary, channels)
 
-    try:
-        node_variables, active_providers, active_ratio = init_node_params(sub_edges, sub_providers, verbose=True)
-    except:
-        print('zero providers!')
-
-    balances, capacities = set_channels_balances_and_capacities(src,trgs,network_dictionary)
-
-    
-    return active_channels, network_dictionary, node_variables, active_providers, balances, capacities, fee_policy_dict, nodes
 
 def create_fee_policy_dict(directed_edges, src):
     """
@@ -389,7 +307,8 @@ def generate_transaction_types(number_of_transaction_types, counts, amounts, eps
     return transaction_types
 
 def get_random_provider(providers, number_of_heads):
-    random.seed()
+    random.seed(44)
+    # random.seed()
     return random.sample(providers, number_of_heads)
 
 def get_base_nodes_by_degree(G,number_of_heads):
