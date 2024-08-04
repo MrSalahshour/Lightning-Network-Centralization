@@ -24,7 +24,7 @@ class TransformerNetwork(nn.Module):
         last_layer_dim_vf: int = 64,
         nhead: int = 4,
         num_encoder_layers: int = 4,
-        dim_feedforward: int = 512,
+        dim_feedforward: int = 128,
     ):
         super().__init__()
 
