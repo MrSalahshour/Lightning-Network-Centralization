@@ -95,39 +95,42 @@ class FeeEnv(gym.Env):
         self.action_space = spaces.MultiDiscrete([self.n_nodes, self.capacity_upper_scale_bound - 1])
 
         self.num_node_features = len(next(iter(self.simulator.current_graph.nodes(data=True)))[1]['feature'])
+        self.num_edge_features = len(next(iter(self.simulator.current_graph.edges(data=True)))[2])
+
         
         #Observation Space
-        self.observation_space = spaces.Box(low=0, high=1, shape=(self.n_nodes, self.num_node_features), dtype=np.float32)
+        # self.observation_space = spaces.Box(low=0, high=1, shape=(self.n_nodes, self.num_node_features), dtype=np.float32)
 
 
-        node_features = self.extract_graph_attributes(self.simulator.current_graph, [], exclude_attributes=['capacity', 'channel_id'])
+        # node_features = self.extract_graph_attributes(self.simulator.current_graph, [], exclude_attributes=['capacity', 'channel_id'])
 
-        self.state = node_features
+        # self.state = node_features
         
         print("num_node_features:", self.num_node_features)
+        print("num_node_features:", self.num_edge_features)
+
         print("number of nodes: ",self.n_nodes)
 
         random.seed(44)
 
 
-        # num_edges = len(self.simulator.current_graph.edges())
-        # self.node_features_space = spaces.Box(low=0, high=1, shape=(self.n_nodes, num_node_features), dtype=np.float32)
-        # self.edge_features_space = spaces.Box(low=0, high=1, shape=(num_edges, num_edge_features), dtype=np.float32)
-        # self.edge_index_space = spaces.Box(low=0, high=self.n_nodes, shape=(2, num_edges), dtype=np.float32)
-        # self.observation_space = spaces.Dict({
-        #     "node_features" : self.node_features_space,
-        #     "edge_attr" : self.edge_features_space,
-        #     "edge_index": self.edge_index_space
-        # })
+        num_edges = len(self.simulator.current_graph.edges())
+
+        self.node_features_space = spaces.Box(low=0, high=1, shape=(self.n_nodes, self.num_node_features), dtype=np.float32)
+        self.edge_features_space = spaces.Box(low=0, high=1, shape=(num_edges, self.num_edge_features), dtype=np.float32)
+        self.edge_index_space = spaces.Box(low=0, high=self.n_nodes, shape=(2, num_edges), dtype=np.float32)
+
+        self.observation_space = spaces.Dict({
+            "node_features" : self.node_features_space,
+            "edge_index": self.edge_index_space
+        })
         
-        # node_features, edge_index, edge_attr = self.extract_graph_attributes(self.simulator.current_graph, exclude_attributes=['capacity', 'channel_id'])
+        node_features, edge_index = self.extract_graph_attributes(self.simulator.current_graph,[])
 
-        # self.state = {
-
-        #     "node_features" : node_features,
-        #     "edge_attr" : edge_attr,
-        #     "edge_index": edge_index
-        # }
+        self.state = {
+            "node_features" : node_features,
+            "edge_index": edge_index
+        }
 
         
 
@@ -203,21 +206,20 @@ class FeeEnv(gym.Env):
       
         # self.simulator.current_graph = self.evolve_graph()
 
-        # node_features, edge_index, edge_attr = self.extract_graph_attributes(self.simulator.current_graph, exclude_attributes=['capacity', 'channel_id'])
-        node_features = self.extract_graph_attributes(self.simulator.current_graph, transaction_amounts, exclude_attributes=['capacity', 'channel_id'])
-        self.state = node_features
+        node_features, edge_index = self.extract_graph_attributes(self.simulator.current_graph,[])
+        # node_features = self.extract_graph_attributes(self.simulator.current_graph, transaction_amounts, exclude_attributes=['capacity', 'channel_id'])
+        # self.state = node_features
 
                 
 
 
 
-        # self.state = {
+        self.state = {
 
-        # "node_features" : node_features,
-        # "edge_attr" : edge_attr,
-        # "edge_index": edge_index
+        "node_features" : node_features,
+        "edge_index": edge_index
 
-        # }
+        }
         
 
 
@@ -248,14 +250,13 @@ class FeeEnv(gym.Env):
 
         # self.remaining_capacity = self.max_capacity
 
-        # node_features, edge_index, edge_attr = self.extract_graph_attributes(self.simulator.current_graph, exclude_attributes=['capacity', 'channel_id'])
-        # self.state = {
-        # "node_features" : node_features,
-        # "edge_attr" : edge_attr,
-        # "edge_index": edge_index
-        # }
-        node_features = self.extract_graph_attributes(self.simulator.current_graph, [], exclude_attributes=['capacity', 'channel_id'])
-        self.state = node_features
+        node_features, edge_index = self.extract_graph_attributes(self.simulator.current_graph,[])
+        self.state = {
+        "node_features" : node_features,
+        "edge_index": edge_index
+        }
+        # node_features = self.extract_graph_attributes(self.simulator.current_graph, [], exclude_attributes=['capacity', 'channel_id'])
+        # self.state = node_features
 
         return self.state 
 
@@ -315,55 +316,9 @@ class FeeEnv(gym.Env):
       
         return trgs_and_caps
     
-    def aggregate_and_standardize_action(self,action):
-        """
-        Aggregates and standardizes the action values in the given action list.
-        
-        The action list is assumed to be a concatenation of node IDs and their corresponding action values. This function first identifies the unique nodes, then aggregates the action values for each node, and finally standardizes the aggregated action values by finding the greatest common divisor (GCD) of the values and dividing each value by the GCD.
-        
-        Args:
-            action (list): A list containing node IDs and their corresponding action values.
-        
-        Returns:
-            list: A list containing the unique nodes and their standardized action values.
-        """
-        midpoint = len(action) // 2
-        unique_nodes = list(set(action[:midpoint]))
-        nonzero_unique_nodes = []
-        action_bal = []
-          
-        for node in unique_nodes:
-            agg_bal = 0
-            for i in range(midpoint):
-                if action[i] == node:
-                    agg_bal += action[i+midpoint]
-            if agg_bal !=0:
-                nonzero_unique_nodes.append(node)
-                action_bal.append(agg_bal)
-        
-        #Standardizing the balances
-        bal_gcd = math.gcd(*action_bal)
-        action_bal = [balance/bal_gcd for balance in action_bal]
         
         return nonzero_unique_nodes + action_bal
     
-    def action_fix(action):
-        """
-        Extracts the connected node IDs and their corresponding capacities from an action.
-        
-        Args:
-            action (list): A list of values representing the capacities of connected nodes.
-        
-        Returns:
-            list: A list containing the connected node IDs and their corresponding capacities.
-        """
-        connected_node_ids = []
-        connected_node_capacities = []
-        for i, val in enumerate(action):
-            if val != 0:
-                connected_node_ids.append(i)
-                connected_node_capacities.append(val)
-        return connected_node_ids + connected_node_capacities
 
     def get_local_graph(self, scale):
         return self.simulator.get_local_graph(scale)
@@ -568,7 +523,7 @@ class FeeEnv(gym.Env):
         
         
         # Extract edge index
-        # edge_index = np.array([(self.simulator.map_nodes_to_id[x], self.simulator.map_nodes_to_id[y]) for (x,y) in G.edges]).T
+        edge_index = np.array([(self.simulator.map_nodes_to_id[x], self.simulator.map_nodes_to_id[y]) for (x,y) in G.edges]).T
 
 
         # Extract multiple edge attributes (excluding specified attributes)
@@ -582,6 +537,8 @@ class FeeEnv(gym.Env):
 
         # self.compare_and_update(edge_attr)
         # return node_features, edge_index, edge_attr
+        return node_features, edge_index
+
 
 
         return node_features

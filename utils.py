@@ -26,22 +26,22 @@ from model.Transformer_policy import TransformerActorCriticPolicy
 
 def make_agent(env, algo, device, tb_log_dir):
     #NOTE: You must use `MultiInputPolicy` when working with dict observation space, not MlpPolicy
-    policy = "MlpPolicy"
-    # policy = "MultiInputPolicy"
+    # policy = "MlpPolicy"
+    policy = "MultiInputPolicy"
     # policy = Custom_policy
     # create model
     if algo == "PPO":
         from stable_baselines3 import PPO
         # Create the custom policy
-        # policy_kwargs = dict(
-        #     features_extractor_class=CustomGATv2Extractor,
-        #     features_extractor_kwargs=dict(features_dim=64),
-        # )
+        policy_kwargs = dict(
+            features_extractor_class=CustomGATv2Extractor,
+            features_extractor_kwargs=dict(features_dim=64),
+        )
         # policy_kwargs = dict(
         #     features_extractor_class=CustomTransformer,
         #     features_extractor_kwargs=dict(features_dim=128, embed_dim=128, nhead=4, num_layers=3),
         # )
-        policy_kwargs = dict(net_arch=dict(pi=[128, 128, 128, 128], qf=[128, 128, 128, 128]))
+        # policy_kwargs = dict(net_arch=dict(pi=[128, 128, 128, 128], qf=[128, 128, 128, 128]))
         
 
         # Instantiate the PPO agent with the custom policy
