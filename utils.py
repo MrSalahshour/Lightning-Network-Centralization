@@ -14,12 +14,13 @@ from env.multi_channel import FeeEnv
 import networkx as nx
 import os
 import pickle
-import graph_embedding_processing
+# import graph_embedding_processing
 from sklearn.model_selection import train_test_split
 from model.GATv2_feature_extractor import CustomGATv2Extractor
 from model.custom_buffer import MyCustomDictRolloutBuffer
 from stable_baselines3.common.env_util import make_vec_env
 from model.Transformer_feature_extractor import CustomTransformer
+from model.Transformer_policy import TransformerActorCriticPolicy
 
 
 
@@ -41,12 +42,16 @@ def make_agent(env, algo, device, tb_log_dir):
         #     features_extractor_kwargs=dict(features_dim=128, embed_dim=128, nhead=4, num_layers=3),
         # )
         policy_kwargs = dict(net_arch=dict(pi=[64, 64, 64, 64], qf=[64, 64, 64, 64]))
+        
 
         # Instantiate the PPO agent with the custom policy
         # model = PPO(policy, env, device=device, tensorboard_log=tb_log_dir,rollout_buffer_class
         # = MyCustomDictRolloutBuffer, policy_kwargs=policy_kwargs, verbose=1)
         # model = PPO(policy, env, verbose=1, device=device, tensorboard_log=tb_log_dir, n_steps=3, batch_size=12, gamma=1)
-        model = PPO(policy, env, verbose=1, device=device, policy_kwargs=policy_kwargs, tensorboard_log=tb_log_dir, n_steps=10, batch_size=40, gamma=1)
+        # model = PPO(policy, env, verbose=1, device=device, policy_kwargs=policy_kwargs, tensorboard_log=tb_log_dir, n_steps=10, batch_size=40, gamma=1)
+
+        model = PPO(TransformerActorCriticPolicy, env, verbose=1, tensorboard_log=tb_log_dir, n_steps=5, batch_size=20, gamma=1)
+
         # model = PPO(policy, env, verbose=1, device=device, tensorboard_log=tb_log_dir, gamma=1)
 
     elif algo == "TRPO":
