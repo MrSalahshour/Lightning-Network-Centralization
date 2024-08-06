@@ -49,7 +49,7 @@ if __name__ == '__main__':
     parser.add_argument('--fee_base_upper_bound', type=int, default=100)
     parser.add_argument('--total_timesteps', type=int, default=100000)
     parser.add_argument('--max_episode_length', type=int, default=3)
-    parser.add_argument('--local_size', type=int, default=10)
+    parser.add_argument('--local_size', type=int, default=50)
     parser.add_argument('--counts', default=[200, 200, 200], type=lambda s: [int(item) for item in s.split(',')])
     parser.add_argument('--amounts', default=[10000, 50000, 100000], type=lambda s: [int(item) for item in s.split(',')])
     parser.add_argument('--epsilons', default=[.6, .6, .6], type=lambda s: [float(item) for item in s.split(',')])
@@ -91,7 +91,7 @@ if __name__ == '__main__':
         data = load_data(env_params['data_path'], env_params['merchants_path'], env_params['local_size'],
                     env_params['n_channels'],env_params['local_heads_number'], env_params["max_capacity"])
         env = make_env(data, env_params, seed, multiple_env = False)
-        for i in range(100):
+        for i in range(200):
             discounted_reward = evaluate(env_params['mode'],strategy, env, env_params, gamma=1)
             reward_list.append(discounted_reward)
             print("discounted reward:", discounted_reward)
