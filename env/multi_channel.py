@@ -95,42 +95,42 @@ class FeeEnv(gym.Env):
         self.action_space = spaces.MultiDiscrete([self.n_nodes, self.capacity_upper_scale_bound - 1])
 
         self.num_node_features = len(next(iter(self.simulator.current_graph.nodes(data=True)))[1]['feature'])
-        self.num_edge_features = len(next(iter(self.simulator.current_graph.edges(data=True)))[2])
+        # self.num_edge_features = len(next(iter(self.simulator.current_graph.edges(data=True)))[2])
 
         
         #Observation Space
-        # self.observation_space = spaces.Box(low=0, high=1, shape=(self.n_nodes, self.num_node_features), dtype=np.float32)
+        self.observation_space = spaces.Box(low=0, high=1, shape=(self.n_nodes, self.num_node_features), dtype=np.float32)
 
 
-        # node_features = self.extract_graph_attributes(self.simulator.current_graph, [], exclude_attributes=['capacity', 'channel_id'])
+        node_features = self.extract_graph_attributes(self.simulator.current_graph, [])
 
-        # self.state = node_features
+        self.state = node_features
         
         print("num_node_features:", self.num_node_features)
-        print("num_node_features:", self.num_edge_features)
+        # print("num_node_features:", self.num_edge_features)
 
         print("number of nodes: ",self.n_nodes)
 
-        random.seed(44)
+        # random.seed(44)
 
 
-        num_edges = len(self.simulator.current_graph.edges())
+        # num_edges = len(self.simulator.current_graph.edges())
 
-        self.node_features_space = spaces.Box(low=0, high=1, shape=(self.n_nodes, self.num_node_features), dtype=np.float32)
-        self.edge_features_space = spaces.Box(low=0, high=1, shape=(num_edges, self.num_edge_features), dtype=np.float32)
-        self.edge_index_space = spaces.Box(low=0, high=self.n_nodes, shape=(2, num_edges), dtype=np.float32)
+        # self.node_features_space = spaces.Box(low=0, high=1, shape=(self.n_nodes, self.num_node_features), dtype=np.float32)
+        # self.edge_features_space = spaces.Box(low=0, high=1, shape=(num_edges, self.num_edge_features), dtype=np.float32)
+        # self.edge_index_space = spaces.Box(low=0, high=self.n_nodes, shape=(2, num_edges), dtype=np.float32)
 
-        self.observation_space = spaces.Dict({
-            "node_features" : self.node_features_space,
-            "edge_index": self.edge_index_space
-        })
+        # self.observation_space = spaces.Dict({
+        #     "node_features" : self.node_features_space,
+        #     "edge_index": self.edge_index_space
+        # })
         
-        node_features, edge_index = self.extract_graph_attributes(self.simulator.current_graph,[])
+        # node_features, edge_index = self.extract_graph_attributes(self.simulator.current_graph,[])
 
-        self.state = {
-            "node_features" : node_features,
-            "edge_index": edge_index
-        }
+        # self.state = {
+        #     "node_features" : node_features,
+        #     "edge_index": edge_index
+        # }
 
         
 
@@ -206,20 +206,20 @@ class FeeEnv(gym.Env):
       
         # self.simulator.current_graph = self.evolve_graph()
 
-        node_features, edge_index = self.extract_graph_attributes(self.simulator.current_graph,[])
-        # node_features = self.extract_graph_attributes(self.simulator.current_graph, transaction_amounts, exclude_attributes=['capacity', 'channel_id'])
-        # self.state = node_features
+        # node_features, edge_index = self.extract_graph_attributes(self.simulator.current_graph,[])
+        node_features = self.extract_graph_attributes(self.simulator.current_graph, transaction_amounts)
+        self.state = node_features
 
                 
 
 
 
-        self.state = {
+        # self.state = {
 
-        "node_features" : node_features,
-        "edge_index": edge_index
+        # "node_features" : node_features,
+        # "edge_index": edge_index
 
-        }
+        # }
         
 
 
@@ -250,13 +250,13 @@ class FeeEnv(gym.Env):
 
         # self.remaining_capacity = self.max_capacity
 
-        node_features, edge_index = self.extract_graph_attributes(self.simulator.current_graph,[])
-        self.state = {
-        "node_features" : node_features,
-        "edge_index": edge_index
-        }
-        # node_features = self.extract_graph_attributes(self.simulator.current_graph, [], exclude_attributes=['capacity', 'channel_id'])
-        # self.state = node_features
+        # node_features, edge_index = self.extract_graph_attributes(self.simulator.current_graph,[])
+        # self.state = {
+        # "node_features" : node_features,
+        # "edge_index": edge_index
+        # }
+        node_features = self.extract_graph_attributes(self.simulator.current_graph, [])
+        self.state = node_features
 
         return self.state 
 
@@ -337,7 +337,7 @@ class FeeEnv(gym.Env):
 
 
     def sample_graph_environment(self, local_size):
-        random.seed(44)
+        # random.seed(44)
         sampled_sub_nodes = preprocessing.fireforest_sample(self.undirected_attributed_LN_graph, local_size, providers=self.providers, local_heads_number=self.local_heads_number)    
         return sampled_sub_nodes
     
@@ -523,7 +523,7 @@ class FeeEnv(gym.Env):
         
         
         # Extract edge index
-        edge_index = np.array([(self.simulator.map_nodes_to_id[x], self.simulator.map_nodes_to_id[y]) for (x,y) in G.edges]).T
+        # edge_index = np.array([(self.simulator.map_nodes_to_id[x], self.simulator.map_nodes_to_id[y]) for (x,y) in G.edges]).T
 
 
         # Extract multiple edge attributes (excluding specified attributes)
@@ -537,7 +537,7 @@ class FeeEnv(gym.Env):
 
         # self.compare_and_update(edge_attr)
         # return node_features, edge_index, edge_attr
-        return node_features, edge_index
+        # return node_features, edge_index
 
 
 

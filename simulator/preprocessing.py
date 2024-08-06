@@ -36,7 +36,7 @@ def fireforest_sample(G, sample_size, providers, local_heads_number, p=0.3):
     Returns:
         list: A list of sampled nodes.
     """
-    random.seed(44)
+    # random.seed(44)
         
     sampled_nodes = set()
     while len(sampled_nodes) < sample_size:
@@ -57,7 +57,7 @@ def fireforest_sample(G, sample_size, providers, local_heads_number, p=0.3):
         #check connectivity and size        
         if len(sampled_nodes) < sample_size and not is_subgraph_connected(G, sampled_nodes):
             sampled_nodes = set()
-            random.seed(17)
+            # random.seed(17)
 
     return sorted(list(sampled_nodes))
 
@@ -307,8 +307,8 @@ def generate_transaction_types(number_of_transaction_types, counts, amounts, eps
     return transaction_types
 
 def get_random_provider(providers, number_of_heads):
-    random.seed(44)
-    # random.seed()
+    # random.seed(44)
+    random.seed()
     return random.sample(providers, number_of_heads)
 
 def get_base_nodes_by_degree(G,number_of_heads):
