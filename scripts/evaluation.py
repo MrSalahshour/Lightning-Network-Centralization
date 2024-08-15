@@ -11,10 +11,10 @@ def evaluate(model, env, gamma):
     rewards = []
     random.seed()
     while not done:
-        action, _state = model.predict(state)
+        # action, _state = model.predict(state)
         # random.seed()
         # action = random.randint(0,9)
-        # action = [random.randint(0,49)] + [5]
+        action = [random.randint(0,9)] + [5]
         # action = np.array(action)
 
         # print("a1",action)
@@ -48,7 +48,7 @@ if __name__ == '__main__':
     parser.add_argument('--fee_base_upper_bound', type=int, default=100)
     parser.add_argument('--max_episode_length', type=int, default=5)
     parser.add_argument('--n_seed', type=int, default=1)  # 5
-    parser.add_argument('--local_size', type=int, default=50)
+    parser.add_argument('--local_size', type=int, default=10)
     parser.add_argument('--node_index', type=int, default=97851)  # 97851
     parser.add_argument('--counts', default=[200, 200, 200], type=lambda s: [int(item) for item in s.split(',')])
     parser.add_argument('--amounts', default=[10000, 50000, 100000],
