@@ -128,7 +128,7 @@ def main():
     parser.add_argument('--tb_name', required=True)
     parser.add_argument('--log_dir', default=r'C:/Users/user01\Downloads/Lightning-Network-Centralization/plotting/tb_results/trained_model/')
     parser.add_argument('--n_seed', type=int, default=1) # 5
-    parser.add_argument('--total_timesteps', type=int, default=150)
+    parser.add_argument('--total_timesteps', type=int, default=1500000)
     parser.add_argument('--max_episode_length', type=int, default=5)
     parser.add_argument('--local_size', type=int, default=50)
     parser.add_argument('--counts', default=[200, 200, 200], type=lambda s: [int(item) for item in s.split(',')])
