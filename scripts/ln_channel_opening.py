@@ -92,8 +92,8 @@ def train(env_params, train_params, tb_log_dir, tb_name, log_dir, seed):
     # model = make_agent(env, train_params['algo'], train_params['device'], tb_log_dir)
     model = make_agent(envs, train_params['algo'], train_params['device'], tb_log_dir)
 
-    # model = load_model("PPO", env_params,"plotting/tb_results/trained_model/PPO_tensorboard_fixed_graph_50nodes_5lengthEpisode_mlp_complex_6featureVersion")
-    # model.set_env(env)
+    # model = load_model("PPO", env_params,"plotting/tb_results/trained_model/PPO_tensorboard_50nodes_5channel_DeepMLP_dynamic_15M_Episode_editedLog")
+    # model.set_env(envs)
 
     #Add Callback for early stopping
     # callback = EarlyStoppingCallback(check_freq=10, n_steps_without_progress=1000)
@@ -128,7 +128,7 @@ def main():
     parser.add_argument('--tb_name', required=True)
     parser.add_argument('--log_dir', default=r'C:/Users/user01\Downloads/Lightning-Network-Centralization/plotting/tb_results/trained_model/')
     parser.add_argument('--n_seed', type=int, default=1) # 5
-    parser.add_argument('--total_timesteps', type=int, default=1500000)
+    parser.add_argument('--total_timesteps', type=int, default=1000000)
     parser.add_argument('--max_episode_length', type=int, default=5)
     parser.add_argument('--local_size', type=int, default=50)
     parser.add_argument('--counts', default=[200, 200, 200], type=lambda s: [int(item) for item in s.split(',')])

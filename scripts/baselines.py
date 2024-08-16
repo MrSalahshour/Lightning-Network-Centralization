@@ -91,7 +91,7 @@ if __name__ == '__main__':
         data = load_data(env_params['data_path'], env_params['merchants_path'], env_params['local_size'],
                     env_params['n_channels'],env_params['local_heads_number'], env_params["max_capacity"])
         env = make_env(data, env_params, seed, multiple_env = False)
-        for i in range(400):
+        for i in range(1000):
             discounted_reward = evaluate(env_params['mode'],strategy, env, env_params, gamma=1)
             reward_list.append(discounted_reward)
             print("discounted reward:", discounted_reward)

@@ -313,7 +313,6 @@ def get_discounted_reward(rewards, gamma):
 
 
 def load_model(algo, env_params, path):
-    node_index = env_params['node_index']
     if algo == 'DDPG':
         from stable_baselines3 import DDPG
         model = DDPG.load(path=path)
