@@ -3,32 +3,32 @@ from stable_baselines3 import SAC, TD3, PPO
 from numpy import load
 import gym
 import numpy as np
-from stable_baselines3.common.callbacks import BaseCallback
+# from stable_baselines3.common.callbacks import BaseCallback
 import random
 
 
-class EarlyStoppingCallback(BaseCallback):
-    def __init__(self, check_freq: int, n_steps_without_progress: int, verbose=0):
-        super(EarlyStoppingCallback, self).__init__(verbose)
-        self.check_freq = check_freq
-        self.n_steps_without_progress = n_steps_without_progress
-        self.best_reward = -np.inf
-        self.n_steps_since_best_reward = 0
+# class EarlyStoppingCallback(BaseCallback):
+    # def __init__(self, check_freq: int, n_steps_without_progress: int, verbose=0):
+    #     super(EarlyStoppingCallback, self).__init__(verbose)
+    #     self.check_freq = check_freq
+    #     self.n_steps_without_progress = n_steps_without_progress
+    #     self.best_reward = -np.inf
+    #     self.n_steps_since_best_reward = 0
 
-    def _on_step(self) -> bool:
-        if self.n_calls % self.check_freq == 0:
-            # Get the current reward estimate
-            x, y = self.model.ep_info_buffer.pop() #infos.get("episode")
-            if y > self.best_reward:
-                self.best_reward = y
-                self.n_steps_since_best_reward = 0
-            else:
-                self.n_steps_since_best_reward += 1
+    # def _on_step(self) -> bool:
+    #     if self.n_calls % self.check_freq == 0:
+    #         # Get the current reward estimate
+    #         x, y = self.model.ep_info_buffer.pop() #infos.get("episode")
+    #         if y > self.best_reward:
+    #             self.best_reward = y
+    #             self.n_steps_since_best_reward = 0
+    #         else:
+    #             self.n_steps_since_best_reward += 1
 
-            if self.n_steps_since_best_reward > self.n_steps_without_progress:
-                print("Stopping training because the reward has not improved for {} steps.".format(self.n_steps_without_progress))
-                return False
-        return True
+    #         if self.n_steps_since_best_reward > self.n_steps_without_progress:
+    #             print("Stopping training because the reward has not improved for {} steps.".format(self.n_steps_without_progress))
+    #             return False
+    #     return True
 
 def train(env_params, train_params, tb_log_dir, tb_name, log_dir, seed):
 
@@ -37,12 +37,12 @@ def train(env_params, train_params, tb_log_dir, tb_name, log_dir, seed):
     
     env = make_env(data, env_params, seed, multiple_env=True)
     model = make_agent(env, train_params['algo'], train_params['device'], tb_log_dir)
-    # model = load_model("PPO", env_params,"plotting/tb_results/trained_model/PPO_tensorboard_fixed_graph_50nodes_5lengthEpisode_mlp_complex_6featureVersion")
+    # model = load_model("PPO", env_params,"plotting/tb_results/trained_model/PPO_tensorboard_128_4layer_MLP_50nodes_3channels_dynamic_graph")
     # model.set_env(env)
 
     #Add Callback for early stopping
-    callback = EarlyStoppingCallback(check_freq=10, n_steps_without_progress=1000)
-    model.learn(total_timesteps=train_params['total_timesteps'], tb_log_name=tb_name, log_interval=5)
+    # callback = EarlyStoppingCallback(check_freq=10, n_steps_without_progress=1000)
+    model.learn(total_timesteps=train_params['total_timesteps'], tb_log_name=tb_name, log_interval=10)
 
     # model.learn(total_timesteps=train_params['total_timesteps'], tb_log_name=tb_name)
     model.save(log_dir+tb_name)
@@ -67,7 +67,7 @@ def main():
     parser.add_argument('--tb_name', required=True)
     parser.add_argument('--log_dir', default='plotting/tb_results/trained_model/')
     parser.add_argument('--n_seed', type=int, default=1) # 5
-    parser.add_argument('--total_timesteps', type=int, default=400000)
+    parser.add_argument('--total_timesteps', type=int, default=200000)
     parser.add_argument('--max_episode_length', type=int, default=3)
     parser.add_argument('--local_size', type=int, default=10)
     parser.add_argument('--counts', default=[200, 200, 200], type=lambda s: [int(item) for item in s.split(',')])

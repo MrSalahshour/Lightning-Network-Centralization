@@ -7,7 +7,7 @@ import os
 
 import numpy as np
 import stable_baselines3
-import sb3_contrib
+# import sb3_contrib
 import secrets
 from simulator import preprocessing
 from env.multi_channel import FeeEnv
@@ -18,30 +18,38 @@ import pickle
 from sklearn.model_selection import train_test_split
 from model.GNN_feature_extractor import CustomGATv2Extractor
 from model.GNN_feature_extractor import GCNFeatureExtractor
-from model.custom_buffer import MyCustomDictRolloutBuffer
+from model.GNN_feature_extractor import GraphFeaturesExtractor
+# from model.custom_buffer import MyCustomDictRolloutBuffer
 from stable_baselines3.common.env_util import make_vec_env
-from model.Transformer_feature_extractor import CustomTransformer
-from model.Transformer_policy import TransformerActorCriticPolicy
+# from model.Transformer_feature_extractor import CustomTransformer
+# from model.Transformer_policy import TransformerActorCriticPolicy
 
 
 
 def make_agent(env, algo, device, tb_log_dir):
     #NOTE: You must use `MultiInputPolicy` when working with dict observation space, not MlpPolicy
-    policy = "MlpPolicy"
+    policy = "GraphInputPolicy"
     # policy = "MultiInputPolicy"
     # policy = Custom_policy
     # create model
-    if algo == "PPO":
+    if algo == "PPO":  
         from stable_baselines3 import PPO
         # Create the custom policy
         # policy_kwargs = dict(
         #     features_extractor_class=CustomGATv2Extractor,
         #     features_extractor_kwargs=dict(features_dim=64),
         # )
-
+        
         # policy_kwargs = dict(
-        #     features_extractor_class=GCNFeatureExtractor,
-        #     features_extractor_kwargs=dict(features_dim=800),
+        #     features_extractor_class=GraphFeaturesExtractor,
+        #     features_extractor_kwargs=dict(gnn_output_dim=64),
+        #     net_arch=[dict(pi=[128, 128, 128, 128], qf=[128, 128, 128, 128])],
+        # )
+        
+        # policy_kwargs = dict(
+        #     features_extractor_class=CustomGATv2Extractor,
+        #     features_extractor_kwargs=dict(features_dim=64),
+        #     net_arch = dict(pi=[128, 128], vf=[128, 128]),
         # )
 
         
@@ -49,14 +57,18 @@ def make_agent(env, algo, device, tb_log_dir):
         #     features_extractor_class=CustomTransformer,
         #     features_extractor_kwargs=dict(features_dim=128, embed_dim=128, nhead=4, num_layers=3),
         # )
-        policy_kwargs = dict(net_arch=dict(pi=[128, 128, 128, 128], qf=[128, 128, 128, 128]))
+        policy_kwargs = dict(
+            # share_features_extractor=False,
+            net_arch = [dict(pi=[128, 128, 128, 128], vf=[128, 128])],
+        ) 
+        
         
 
         # Instantiate the PPO agent with the custom policy
         # model = PPO(policy, env, device=device, tensorboard_log=tb_log_dir,rollout_buffer_class
         # = MyCustomDictRolloutBuffer, policy_kwargs=policy_kwargs, verbose=1)
         # model = PPO(policy, env, verbose=1, device=device, tensorboard_log=tb_log_dir, n_steps=3, batch_size=12, gamma=1)
-        model = PPO(policy, env, verbose=1, device=device, policy_kwargs=policy_kwargs, tensorboard_log=tb_log_dir, n_steps=30, batch_size=30, gamma=1)
+        model = PPO(policy, env, verbose=1, device=device,policy_kwargs=policy_kwargs, tensorboard_log=tb_log_dir, n_steps=30, batch_size=30, gamma=1)
 
         # model = PPO(TransformerActorCriticPolicy, env, verbose=1, tensorboard_log=tb_log_dir, n_steps=5, batch_size=20, gamma=1)
 
@@ -99,7 +111,7 @@ def make_env(data, env_params, seed, multiple_env):
     providers = data['providers']
 
     G = preprocessing.make_LN_graph(directed_edges, providers)
-
+    multiple_env = False
    
     if multiple_env == False:
         env = FeeEnv(data, env_params['max_capacity'], env_params['max_episode_length'], len(env_params['counts']),
@@ -267,7 +279,8 @@ def get_random_channels_and_capacities(capacity_upper_scale_bound,n_channels,n_n
     vector1 = np.random.randint(0, n_nodes, 1).tolist()
     
     # Create a vector of size n_channels with random integers between 0 and 50
-    vector2 = np.random.randint(0, capacity_upper_scale_bound + 1, 1).tolist()
+    vector2 = [5]
+    # vector2 = np.random.randint(0, capacity_upper_scale_bound + 1, 1).tolist()
 
     return vector1 + vector2
 
@@ -312,7 +325,6 @@ def get_discounted_reward(rewards, gamma):
 
 
 def load_model(algo, env_params, path):
-    node_index = env_params['node_index']
     if algo == 'DDPG':
         from stable_baselines3 import DDPG
         model = DDPG.load(path=path)

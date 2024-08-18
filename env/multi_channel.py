@@ -1,6 +1,7 @@
 import gym
-from gym import spaces
-from gym.spaces import *
+# from gymnasium import spaces
+from gym.spaces.multi_discrete import MultiDiscrete
+from gym.spaces import Box, Graph, GraphInstance, Dict
 from gym.utils import seeding
 import numpy as np
 import graph_embedding_processing
@@ -8,6 +9,7 @@ from simulator import preprocessing
 from simulator.simulator import simulator
 from simulator.preprocessing import generate_transaction_types
 import time
+from torch_geometric.utils import from_networkx
 
 import random
 from collections import Counter
@@ -81,6 +83,7 @@ class FeeEnv(gym.Env):
         self.total_time_step = 0
         self.time_step = 0
         self.prev_action = [] 
+        
 
         self.undirected_attributed_LN_graph = self.set_undirected_attributed_LN_graph()
         self.transaction_types = generate_transaction_types(number_of_transaction_types, counts, amounts, epsilons)
@@ -92,19 +95,54 @@ class FeeEnv(gym.Env):
 
         
         #Action Space
-        self.action_space = spaces.MultiDiscrete([self.n_nodes, self.capacity_upper_scale_bound - 1])
+        self.action_space = MultiDiscrete([self.n_nodes, self.capacity_upper_scale_bound - 1])
 
         self.num_node_features = len(next(iter(self.simulator.current_graph.nodes(data=True)))[1]['feature'])
-        # self.num_edge_features = len(next(iter(self.simulator.current_graph.edges(data=True)))[2])
+        self.num_edge_features = len(next(iter(self.simulator.current_graph.edges(data=True)))[2])
 
         
         #Observation Space
-        self.observation_space = spaces.Box(low=0, high=1, shape=(self.n_nodes, self.num_node_features), dtype=np.float32)
+
+        node_space = Box(low=-np.inf, high=np.inf, shape=(self.num_node_features,), dtype=np.float32)
+        edge_space = Box(low=-np.inf, high=np.inf, shape=(self.num_edge_features,), dtype=np.float32)
+
+        self.observation_space = Graph(node_space=node_space, edge_space=edge_space)
 
 
-        node_features = self.extract_graph_attributes(self.simulator.current_graph, [])
+        # self.observation_space = spaces.Box(low=0, high=1, shape=(self.n_nodes, self.num_node_features), dtype=np.float32)
 
-        self.state = node_features
+        # self.observation_space = Dict({
+        #     'node_features': Box(low=-np.inf, high=np.inf, shape=(self.n_nodes, self.num_node_features), dtype=np.float32),
+        #     'edge_index': Box(low=0, high=self.n_nodes-1, shape=(2, self.n_nodes*(self.n_nodes - 1)), dtype=np.int64)
+        # })
+
+
+        
+        # node_features = self.extract_graph_attributes(self.simulator.current_graph, [])
+
+        self.update_graph_features(self.simulator.current_graph)
+        # # # Convert to PyTorch Geometric data
+        # graph_data = from_networkx(self.simulator.current_graph)
+
+        # # # Extract node features and edge index
+        # node_features = np.array([self.simulator.current_graph.nodes[node]['feature'] for node in self.simulator.current_graph.nodes()])
+        # edge_index = graph_data.edge_index.numpy()
+
+        # # # Add padding for compatibility of edge index for GNNs
+        # max_edges = self.n_nodes * (self.n_nodes - 1)
+        # if edge_index.shape[1] < max_edges:
+        #     padding = np.full((2, max_edges - edge_index.shape[1]), -1, dtype=np.int64)
+        #     edge_index = np.concatenate((edge_index, padding), axis=1)
+
+        # self.state = {
+        #     "node_features" : node_features,
+        #     "edge_index": edge_index
+        # }
+
+        graph_instance = self.convert_nx_to_graph_instance(self.simulator.current_graph)
+        self.state = graph_instance
+
+        # self.state = node_features
         
         print("num_node_features:", self.num_node_features)
         # print("num_node_features:", self.num_edge_features)
@@ -179,7 +217,7 @@ class FeeEnv(gym.Env):
         _, transaction_amounts, transaction_numbers = self.simulate_transactions(fees, self.simulator.trgs)
 
         if self.time_step == self.max_episode_length - 1: 
-            reward = 1e-6*(np.sum(np.multiply(self.simulator.src_fee_rate, transaction_amounts ) + \
+            reward = 1e-10*(np.sum(np.multiply(self.simulator.src_fee_rate, transaction_amounts ) + \
                     np.multiply(self.simulator.src_fee_base, transaction_numbers)))
         else: 
             reward = 0
@@ -207,11 +245,34 @@ class FeeEnv(gym.Env):
         # self.simulator.current_graph = self.evolve_graph()
 
         # node_features, edge_index = self.extract_graph_attributes(self.simulator.current_graph,[])
-        node_features = self.extract_graph_attributes(self.simulator.current_graph, transaction_amounts)
-        self.state = node_features
+        # node_features = self.extract_graph_attributes(self.simulator.current_graph, transaction_amounts)
+        # self.state = node_features
 
-                
+        self.update_graph_features(self.simulator.current_graph)
 
+        # # # Convert to PyTorch Geometric data
+        # graph_data = from_networkx(self.simulator.current_graph)
+
+        # # # Extract node features and edge index
+        # node_features = np.array([self.simulator.current_graph.nodes[node]['feature'] for node in self.simulator.current_graph.nodes()])
+        # edge_index = graph_data.edge_index.numpy()
+
+
+        # # # Add padding for compatibility of edge index for GNNs
+        # max_edges = self.n_nodes * (self.n_nodes - 1)
+        # if edge_index.shape[1] < max_edges:
+        #     padding = np.full((2, max_edges - edge_index.shape[1]), -1, dtype=np.int64)
+        #     edge_index = np.concatenate((edge_index, padding), axis=1)
+
+        
+
+        # self.state = {
+        #     "node_features" : node_features,
+        #     "edge_index": edge_index
+        # }
+
+        graph_instance = self.convert_nx_to_graph_instance(self.simulator.current_graph)
+        self.state = graph_instance
 
 
         # self.state = {
@@ -255,8 +316,33 @@ class FeeEnv(gym.Env):
         # "node_features" : node_features,
         # "edge_index": edge_index
         # }
-        node_features = self.extract_graph_attributes(self.simulator.current_graph, [])
-        self.state = node_features
+        # node_features = self.extract_graph_attributes(self.simulator.current_graph, [])
+        # self.state = node_features
+        
+
+        self.update_graph_features(self.simulator.current_graph)
+
+        graph_instance = self.convert_nx_to_graph_instance(self.simulator.current_graph)
+        self.state = graph_instance
+
+        # # # Convert to PyTorch Geometric data
+        # graph_data = from_networkx(self.simulator.current_graph)
+
+        # # # Extract node features and edge index
+        # node_features = np.array([self.simulator.current_graph.nodes[node]['feature'] for node in self.simulator.current_graph.nodes()])
+        # edge_index = graph_data.edge_index.numpy()
+        
+
+        # # # Add padding for compatibility of edge index for GNNs
+        # max_edges = self.n_nodes * (self.n_nodes - 1)
+        # if edge_index.shape[1] < max_edges:
+        #     padding = np.full((2, max_edges - edge_index.shape[1]), -1, dtype=np.int64)
+        #     edge_index = np.concatenate((edge_index, padding), axis=1)
+
+        # self.state = {
+        #     "node_features" : node_features,
+        #     "edge_index": edge_index
+        # }
 
         return self.state 
 
@@ -445,6 +531,22 @@ class FeeEnv(gym.Env):
                                    graph_nodes = self.graph_nodes,
                                    current_graph = sub_graph)
         
+    
+    def update_graph_features(self, graph):
+
+        degrees = preprocessing.get_nodes_degree_centrality(self.simulator.current_graph)
+
+        if np.max(self.simulator.nodes_cumulative_trs_amounts) == 0:
+            normalized_transaction_amounts = np.zeros_like(self.simulator.nodes_cumulative_trs_amounts)
+        else:
+            normalized_transaction_amounts = self.simulator.nodes_cumulative_trs_amounts / np.sum(self.simulator.nodes_cumulative_trs_amounts)
+        for node in graph.nodes(data = True):
+            is_provider = graph.nodes[node[0]]['feature'][1]
+            relative_connection = 0
+            if node[0] in self.simulator.trgs:
+                relative_connection = self.simulator.shares[node[0]]/sum(self.simulator.shares.values())
+            graph.nodes[node[0]]['feature'] = np.array([degrees[node[0]], is_provider, normalized_transaction_amounts[self.simulator.map_nodes_to_id[node[0]]], relative_connection])
+        
         
         
     def extract_graph_attributes(self, G, transaction_amounts, exclude_attributes=None):
@@ -546,4 +648,42 @@ class FeeEnv(gym.Env):
     def get_normalizer_configs(self):
         #return cap_max, base_max, rate_max
         return self.data["fee_base_max"], self.data["fee_rate_max"], self.data["capacity_max"], 100*(10000+50000+100000) # maximum amount of transaction per step
+    
+
+
+    def convert_nx_to_graph_instance(self, nx_graph):
+        # Extract node features
+        node_features = np.zeros(shape = (self.n_nodes, self.num_node_features))
+        nodes_list = nx_graph.nodes(data = True)
+
+        degrees = preprocessing.get_nodes_degree_centrality(self.simulator.current_graph)
+
+        if np.max(self.simulator.nodes_cumulative_trs_amounts) == 0:
+            normalized_transaction_amounts = np.zeros_like(self.simulator.nodes_cumulative_trs_amounts)
+        else:
+            normalized_transaction_amounts = self.simulator.nodes_cumulative_trs_amounts / np.sum(self.simulator.nodes_cumulative_trs_amounts)
+            
+        
+        #set node features 
+        for node in nodes_list:
+            node_features[self.simulator.map_nodes_to_id[node[0]]][0] = degrees[node[0]]
+            node_features[self.simulator.map_nodes_to_id[node[0]]][1] = nx_graph.nodes[node[0]]["feature"][1]
+            node_features[self.simulator.map_nodes_to_id[node[0]]][2] = normalized_transaction_amounts[self.simulator.map_nodes_to_id[node[0]]]
+            node_features[self.simulator.map_nodes_to_id[node[0]]][3] = 0
+            if node[0] in self.simulator.trgs:
+                node_features[self.simulator.map_nodes_to_id[node[0]]][3] = self.simulator.shares[node[0]]/sum(self.simulator.shares.values())
+        
+        # Extract selected edge features
+        selected_edge_attrs = ['capacity', 'fee_base_msat', 'fee_rate_milli_msat', 'balance']
+        edge_features = []
+        for u, v, data in nx_graph.edges(data=True):
+            edge_features.append([data[attr] for attr in selected_edge_attrs])
+        edge_features = np.array(edge_features)
+        
+        # Extract edge links
+        edge_links = np.array([(self.simulator.map_nodes_to_id[x], self.simulator.map_nodes_to_id[y]) for (x,y) in nx_graph.edges]).T
+
+
+        
+        return GraphInstance(nodes=node_features, edges=edge_features, edge_links=edge_links)
     

@@ -97,7 +97,7 @@ if __name__ == '__main__':
                     env_params['n_channels'],env_params['local_heads_number'], env_params["max_capacity"])
         for algo in algos:
             env = make_env(data, env_params, seed, multiple_env = False)
-            model = PPO.load("plotting/tb_results/trained_model/PPO_tensorboard_10nodes_3channels_dynamic_graph_MLP_128hidden_4layer",env)
+            model = PPO.load("plotting/tb_results/trained_model/PPO_tensorboard_10nodes_3channels_dynamic_graph_MLP_128hidden_4layer_fineTunning",env)
             # model = load_model(algo, env_params,"plotting/tb_results/trained_model/PPO_tensorboard_7step_50nodes_fixed_graph_complex_mlp_4_env_with_capacity_new_idea")
             # model.set_env(env)
 
