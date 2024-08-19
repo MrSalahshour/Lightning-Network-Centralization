@@ -223,7 +223,7 @@ class FeeEnv(gym.Env):
         
 
 
-        return self.state, reward, done, info
+        return self.state, reward/10000, done, info
     
     def generate_number_of_new_channels(self, time_step):
         #TODO: generate the number of added channels base on time step
