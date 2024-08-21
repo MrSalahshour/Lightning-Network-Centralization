@@ -57,9 +57,9 @@ class GATv2(nn.Module):
             graph_mask = batch.batch == i
             num_nodes = graph_mask.sum().item()
             final_output[i, :num_nodes, :] = encoded_features[graph_mask]
-        
+            #[batch, node, hidden_dim=32]
             
-        return final_output
+        return #(final_output, mask)
 
 
 
