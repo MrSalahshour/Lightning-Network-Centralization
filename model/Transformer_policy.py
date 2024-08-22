@@ -34,6 +34,10 @@ SelfTransformerMultiCategoricalDistribution = TypeVar("SelfTransformerMultiCateg
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch_geometric as thg
+
+
+from model.GNNFeatureExtractor import GraphFeaturesExtractor2
 
 def get_flattened_obs_dim(observation_space: spaces.Space) -> int:
     """
@@ -299,13 +303,13 @@ class CustomTransformerExtractor(nn.Module):
 
         x, mask = features
         # embedded = self.transformer(self.embedder(x), mask)
-        embedded = self.embedder_pi(x)
-        transformer_output = self.transformer_pi(embedded, mask)
+        # embedded = self.embedder_pi(x)
+        # transformer_output = self.transformer_pi(x, mask)
         # Acts as the body of the policy network, either transformer or mlp
         # node_embeddings = self.policy_net(embedded)
         
         # Node scores
-        node_scores = self.scoring_net(transformer_output)
+        node_scores = self.scoring_net(x)
         
         # STD and Mean
         # std_dev = self.std_net(transformer_output) + 1.1
@@ -316,15 +320,15 @@ class CustomTransformerExtractor(nn.Module):
         
         # # The output is the distibution by which the node capacity allocation is done
         # allocation_distribution = self.normal_distribution_tensor(cap_alloc_init, size = 9, std_dev= std_dev) 
-        return node_scores, self.flatten(transformer_output)
+        return node_scores, self.flatten(x)
         
     def forward_critic(self, features: th.Tensor) -> th.Tensor:
         #intuition: value net should not rely on a transformer:: Proven wrong
         input, mask = features
         # embedded = self.transformer(self.embedder(x), mask)
-        embedded = self.embedder_pi(input)
-        transformer_output = self.transformer_pi(embedded, mask)
-        return self.value_net(transformer_output)
+        # embedded = self.embedder_pi(input)
+        # transformer_output = self.transformer_pi(input, mask)
+        return self.value_net(input)
     
 class NullFeatureExtractor(BaseFeaturesExtractor):
     """
@@ -340,7 +344,6 @@ class NullFeatureExtractor(BaseFeaturesExtractor):
         # return (observations["node_features"],  (observations["node_features"][:, :, 3] != 0).long())
         return observations, (observations[:,:,3] != 0).long()
 
-    
 class TransformerMultiCategoricalDistribution(Distribution):
     """
     MultiCategorical distribution for multi discrete actions.
@@ -431,7 +434,7 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
         full_std: bool = True,
         use_expln: bool = False,
         squash_output: bool = False,
-        features_extractor_class: Type[BaseFeaturesExtractor] = NullFeatureExtractor,
+        features_extractor_class: Type[BaseFeaturesExtractor] = GraphFeaturesExtractor2,
         features_extractor_kwargs: Optional[Dict[str, Any]] = None,
         share_features_extractor: bool = True,
         normalize_images: bool = True,
@@ -450,18 +453,42 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
             use_sde,
             log_std_init,
             full_std,
+            [],
             use_expln,
             squash_output,
             features_extractor_class,
             features_extractor_kwargs,
-            share_features_extractor,
             normalize_images,
             optimizer_class,
             optimizer_kwargs,
         )
+        self.share_features_extractor = True
         self.action_dist = custom_make_proba_distribution(action_space, use_sde=use_sde, dist_kwargs=self.dist_kwargs)
         self._build(lr_schedule)
         
+    def obs_to_tensor(self, observation: gym.spaces.GraphInstance):
+            if isinstance(observation, list):
+                vectorized_env = True
+            else:
+                vectorized_env = False
+            if vectorized_env:
+                torch_obs = list()
+                for obs in observation:
+                    x = th.tensor(obs.nodes).float()
+                    #edge_index = th.tensor(obs.edge_links, dtype=th.long).t().contiguous().view(2, -1)
+                    edge_index = th.tensor(obs.edge_links, dtype=th.long)
+                    # edges = th.tensor(obs.edges, dtype=th.float)
+                    torch_obs.append(thg.data.Data(x=x, edge_index=edge_index))
+                if len(torch_obs) == 1:
+                    torch_obs = torch_obs[0]
+            else:
+                x = th.tensor(observation.nodes).float()
+                #edge_index = th.tensor(observation.edge_links, dtype=th.long).t().contiguous().view(2, -1)
+                edge_index = th.tensor(observation.edge_links, dtype=th.long)
+                # edges = th.tensor(observation.edges, dtype=th.float)
+                torch_obs = thg.data.Data(x=x, edge_index=edge_index)
+            return torch_obs, vectorized_env
+           
     def _build_mlp_extractor(self) -> None:
          self.mlp_extractor = CustomTransformerExtractor(
             self.features_dim,

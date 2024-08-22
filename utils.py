@@ -1,9 +1,9 @@
 import sys
 import os
 
-# project_root = os.path.dirname(os.path.realpath(__file__))
-# stable_path = os.path.join(project_root, "stable-baselines3")
-# sys.path.append(stable_path)
+project_root = os.path.dirname(os.path.realpath(__file__))
+stable_path = os.path.join(project_root, "custom-sb3","sb3")
+sys.path.append(stable_path)
 
 import numpy as np
 import stable_baselines3
@@ -21,6 +21,7 @@ from model.GNNFeatureExtractor import CustomGATv2Extractor
 from stable_baselines3.common.env_util import make_vec_env
 # from model.Transformer_feature_extractor import CustomTransformer
 from model.Transformer_policy import CustomActorCriticPolicy , NullFeatureExtractor
+from model.GNNFeatureExtractor import GraphFeaturesExtractor2
 
 
 
@@ -51,9 +52,9 @@ def make_agent(env, algo, device, tb_log_dir):
         #     features_extractor_kwargs=dict(features_dim=128, embed_dim=128, nhead=4, num_layers=3),
         # )
         policy_kwargs = dict(net_arch=dict(pi=[], vf=[256, 256]),
-                             features_extractor_class = NullFeatureExtractor,
+                             features_extractor_class = GraphFeaturesExtractor2,
                              features_extractor_kwargs = dict(features_dim=32),
-                             share_features_extractor = False)
+                             share_features_extractor = True)
         
 
         # Instantiate the PPO agent with the custom policy
