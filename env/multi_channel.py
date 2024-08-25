@@ -103,13 +103,13 @@ class FeeEnv(gym.Env):
         
         #Observation Space
 
-        node_space = Box(low=-np.inf, high=np.inf, shape=(self.num_node_features,), dtype=np.float32)
-        edge_space = Box(low=-np.inf, high=np.inf, shape=(self.num_edge_features,), dtype=np.float32)
+        # node_space = Box(low=-np.inf, high=np.inf, shape=(self.num_node_features,), dtype=np.float32)
+        # edge_space = Box(low=-np.inf, high=np.inf, shape=(self.num_edge_features,), dtype=np.float32)
 
-        self.observation_space = Graph(node_space=node_space, edge_space=edge_space)
+        # self.observation_space = Graph(node_space=node_space, edge_space=edge_space)
 
 
-        # self.observation_space = spaces.Box(low=0, high=1, shape=(self.n_nodes, self.num_node_features), dtype=np.float32)
+        self.observation_space = Box(low=-np.inf, high=np.inf, shape=(self.n_nodes, self.num_node_features), dtype=np.float32)
 
         # self.observation_space = Dict({
         #     'node_features': Box(low=-np.inf, high=np.inf, shape=(self.n_nodes, self.num_node_features), dtype=np.float32),
@@ -118,9 +118,9 @@ class FeeEnv(gym.Env):
 
 
         
-        # node_features = self.extract_graph_attributes(self.simulator.current_graph, [])
+        node_features = self.extract_graph_attributes(self.simulator.current_graph, [])
 
-        self.update_graph_features(self.simulator.current_graph)
+        # self.update_graph_features(self.simulator.current_graph)
         # # # Convert to PyTorch Geometric data
         # graph_data = from_networkx(self.simulator.current_graph)
 
@@ -139,10 +139,10 @@ class FeeEnv(gym.Env):
         #     "edge_index": edge_index
         # }
 
-        graph_instance = self.convert_nx_to_graph_instance(self.simulator.current_graph)
-        self.state = graph_instance
+        # graph_instance = self.convert_nx_to_graph_instance(self.simulator.current_graph)
+        # self.state = graph_instance
 
-        # self.state = node_features
+        self.state = node_features
         
         print("num_node_features:", self.num_node_features)
         # print("num_node_features:", self.num_edge_features)
@@ -246,10 +246,11 @@ class FeeEnv(gym.Env):
         # self.simulator.current_graph = self.evolve_graph()
 
         # node_features, edge_index = self.extract_graph_attributes(self.simulator.current_graph,[])
-        # node_features = self.extract_graph_attributes(self.simulator.current_graph, transaction_amounts)
-        # self.state = node_features
-
         self.update_graph_features(self.simulator.current_graph)
+
+        node_features = self.extract_graph_attributes(self.simulator.current_graph, transaction_amounts)
+        self.state = node_features
+
 
         # # # Convert to PyTorch Geometric data
         # graph_data = from_networkx(self.simulator.current_graph)
@@ -272,8 +273,8 @@ class FeeEnv(gym.Env):
         #     "edge_index": edge_index
         # }
 
-        graph_instance = self.convert_nx_to_graph_instance(self.simulator.current_graph)
-        self.state = graph_instance
+        # graph_instance = self.convert_nx_to_graph_instance(self.simulator.current_graph)
+        # self.state = graph_instance
 
 
         # self.state = {
@@ -317,14 +318,14 @@ class FeeEnv(gym.Env):
         # "node_features" : node_features,
         # "edge_index": edge_index
         # }
-        # node_features = self.extract_graph_attributes(self.simulator.current_graph, [])
-        # self.state = node_features
+        node_features = self.extract_graph_attributes(self.simulator.current_graph, [])
+        self.state = node_features
         
 
-        self.update_graph_features(self.simulator.current_graph)
+        # self.update_graph_features(self.simulator.current_graph)
 
-        graph_instance = self.convert_nx_to_graph_instance(self.simulator.current_graph)
-        self.state = graph_instance
+        # graph_instance = self.convert_nx_to_graph_instance(self.simulator.current_graph)
+        # self.state = graph_instance
 
         # # # Convert to PyTorch Geometric data
         # graph_data = from_networkx(self.simulator.current_graph)
